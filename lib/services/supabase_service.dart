@@ -12,6 +12,8 @@ class SupabaseService {
   static SupabaseService? _instance;
   static bool _isInitialized = false;
 
+  bool get isInitialized => _isInitialized;
+
   SupabaseClient get client => Supabase.instance.client;
 
   SupabaseService._();

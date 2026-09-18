@@ -7,11 +7,11 @@ class UserProfileModel {
   final String? avatarUrl;
 
   const UserProfileModel({
-    this.fullName = 'Dhaka Transit User',
-    this.email = 'user@transit.bd',
-    this.phoneNumber = '+880 1712-345678',
+    this.fullName = '',
+    this.email = '',
+    this.phoneNumber = '',
     this.gender = 'male',
-    this.dob = '1990-01-01',
+    this.dob = '1995-05-15',
     this.avatarUrl,
   });
 

@@ -145,65 +145,10 @@ class TicketModel {
   }
 
   static List<TicketModel> getInitialTickets() {
-    final now = DateTime.now();
-    return [
-      TicketModel(
-        id: 'TKT-1001',
-        origin: 'Uttara North',
-        destination: 'Motijheel',
-        passengerCount: 1,
-        farePerPerson: 60,
-        totalFare: 60,
-        status: TicketStatus.available,
-        purchaseTime: now.subtract(const Duration(minutes: 15)),
-      ),
-    ];
+    return [];
   }
 
   static List<TicketModel> getInitialHistory() {
-    return [
-      TicketModel(
-        id: 'TKT-0998',
-        origin: 'Uttara North',
-        destination: 'Motijheel',
-        passengerCount: 1,
-        farePerPerson: 100,
-        totalFare: 100,
-        purchaseTime: DateTime(2026, 9, 11, 9, 30),
-        completeTime: DateTime(2026, 9, 11, 10, 15),
-        status: TicketStatus.completed,
-      ),
-      TicketModel(
-        id: 'TKT-0995',
-        origin: 'Farmgate',
-        destination: 'Shahbagh',
-        passengerCount: 2,
-        farePerPerson: 20,
-        totalFare: 40,
-        purchaseTime: DateTime(2026, 9, 8, 17, 45),
-        completeTime: DateTime(2026, 9, 8, 18, 10),
-        status: TicketStatus.completed,
-      ),
-      TicketModel(
-        id: 'TKT-0982',
-        origin: 'Pallabi',
-        destination: 'Agargaon',
-        passengerCount: 1,
-        farePerPerson: 40,
-        totalFare: 40,
-        purchaseTime: DateTime(2026, 9, 2, 8, 15),
-        status: TicketStatus.expired,
-      ),
-      TicketModel(
-        id: 'TKT-0971',
-        origin: 'Mirpur 10',
-        destination: 'Secretariat',
-        passengerCount: 1,
-        farePerPerson: 60,
-        totalFare: 60,
-        purchaseTime: DateTime(2026, 8, 28, 11, 20),
-        status: TicketStatus.refunded,
-      ),
-    ];
+    return [];
   }
 }

@@ -51,44 +51,7 @@ class HistoryTicketModel {
   }
 
   static List<HistoryTicketModel> getSampleHistory() {
-    return [
-      HistoryTicketModel(
-        id: 'TKT-1001',
-        origin: 'Uttara North',
-        destination: 'Motijheel',
-        passengerCount: 1,
-        totalFare: 100,
-        purchaseTime: DateTime(2026, 9, 11, 9, 30),
-        status: HistoryStatus.completed,
-      ),
-      HistoryTicketModel(
-        id: 'TKT-1002',
-        origin: 'Farmgate',
-        destination: 'Shahbagh',
-        passengerCount: 2,
-        totalFare: 40,
-        purchaseTime: DateTime(2026, 9, 8, 17, 45),
-        status: HistoryStatus.completed,
-      ),
-      HistoryTicketModel(
-        id: 'TKT-1003',
-        origin: 'Pallabi',
-        destination: 'Agargaon',
-        passengerCount: 1,
-        totalFare: 40,
-        purchaseTime: DateTime(2026, 9, 2, 8, 15),
-        status: HistoryStatus.expired,
-      ),
-      HistoryTicketModel(
-        id: 'TKT-1004',
-        origin: 'Mirpur 10',
-        destination: 'Secretariat',
-        passengerCount: 1,
-        totalFare: 60,
-        purchaseTime: DateTime(2026, 8, 28, 11, 20),
-        status: HistoryStatus.refunded,
-      ),
-    ];
+    return [];
   }
 }
 

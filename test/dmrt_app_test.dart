@@ -24,10 +24,79 @@ import 'package:dmrt_online/services/supabase_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
+  final sampleTicket = TicketModel(
+    id: 'TKT-1001',
+    origin: 'Uttara North',
+    destination: 'Motijheel',
+    passengerCount: 1,
+    farePerPerson: 60,
+    totalFare: 60,
+    status: TicketStatus.available,
+    purchaseTime: DateTime(2026, 9, 15, 8, 30),
+  );
+
+  final sampleHistory = [
+    TicketModel(
+      id: 'TKT-901',
+      origin: 'Uttara North',
+      destination: 'Motijheel',
+      passengerCount: 1,
+      farePerPerson: 60,
+      totalFare: 60,
+      status: TicketStatus.completed,
+      purchaseTime: DateTime(2026, 9, 14, 9, 0),
+      completeTime: DateTime(2026, 9, 14, 9, 45),
+    ),
+    TicketModel(
+      id: 'TKT-902',
+      origin: 'Pallabi',
+      destination: 'Agargaon',
+      passengerCount: 1,
+      farePerPerson: 30,
+      totalFare: 30,
+      status: TicketStatus.expired,
+      purchaseTime: DateTime(2026, 9, 13, 10, 0),
+    ),
+    TicketModel(
+      id: 'TKT-903',
+      origin: 'Mirpur 10',
+      destination: 'Farmgate',
+      passengerCount: 1,
+      farePerPerson: 30,
+      totalFare: 30,
+      status: TicketStatus.refunded,
+      purchaseTime: DateTime(2026, 9, 12, 11, 0),
+    ),
+  ];
+
+  Future<void> seedAuthenticatedUser({
+    List<TicketModel>? tickets,
+    List<TicketModel>? history,
+    UserProfileModel? profile,
+  }) async {
+    SharedPreferences.setMockInitialValues({});
+    final storage = await AppStorageService.getInstance();
+    await storage.saveAuthState(isAuthenticated: true, phoneNumber: '+880 1712-345678');
+    await storage.saveUserProfile(profile ?? const UserProfileModel(
+      fullName: 'Dhaka Transit User',
+      phoneNumber: '+880 1712-345678',
+      email: 'commuter@dmrt.bd',
+      gender: 'Male',
+      dob: '1996-01-01',
+    ));
+    if (tickets != null) {
+      await storage.saveTickets(tickets);
+    }
+    if (history != null) {
+      await storage.saveHistory(history);
+    }
+  }
+
   setUp(() {
     SharedPreferences.setMockInitialValues({});
     AppStorageService.resetInstanceForTesting();
   });
+
   group('StationData & Fare Calculations', () {
     test('calculateFare tests matching Dhaka Metro MRT rules', () {
       expect(StationData.calculateFare('Uttara North', 'Uttara Center'), 20); // gap 1
@@ -40,7 +109,17 @@ void main() {
   });
 
   group('HomeScreen & BuyTicketScreen Widget Tests', () {
-    testWidgets('HomeScreen layout smoke test', (WidgetTester tester) async {
+    testWidgets('Fresh unauthenticated app boots cleanly to PhoneLoginScreen', (WidgetTester tester) async {
+      await tester.pumpWidget(const DmrtApp());
+      await tester.pumpAndSettle();
+
+      expect(find.text('Enter your phone number'), findsOneWidget);
+      expect(find.text('+880'), findsOneWidget);
+      expect(find.text('Next'), findsOneWidget);
+    });
+
+    testWidgets('Authenticated HomeScreen layout smoke test with tickets', (WidgetTester tester) async {
+      await seedAuthenticatedUser(tickets: [sampleTicket]);
       await tester.pumpWidget(const DmrtApp());
       await tester.pumpAndSettle();
 
@@ -52,7 +131,18 @@ void main() {
       expect(find.text('Use Ticket'), findsOneWidget);
     });
 
+    testWidgets('Authenticated HomeScreen layout smoke test with zero tickets', (WidgetTester tester) async {
+      await seedAuthenticatedUser(tickets: []);
+      await tester.pumpWidget(const DmrtApp());
+      await tester.pumpAndSettle();
+
+      expect(find.byType(WelcomeCard), findsOneWidget);
+      expect(find.text('My Tickets'), findsOneWidget);
+      expect(find.text('No active tickets available.'), findsOneWidget);
+    });
+
     testWidgets('Navigate to BuyTicketScreen via Welcome Card Buy Ticket button', (WidgetTester tester) async {
+      await seedAuthenticatedUser();
       await tester.pumpWidget(const DmrtApp());
       await tester.pumpAndSettle();
 
@@ -123,6 +213,7 @@ void main() {
     });
 
     testWidgets('HistoryScreen renders tabs and cards correctly', (WidgetTester tester) async {
+      await seedAuthenticatedUser(history: sampleHistory);
       await tester.pumpWidget(const DmrtApp());
       await tester.pumpAndSettle();
 
@@ -148,6 +239,7 @@ void main() {
     });
 
     testWidgets('ProfileScreen renders fields, modals and saves changes correctly', (WidgetTester tester) async {
+      await seedAuthenticatedUser();
       await tester.pumpWidget(const DmrtApp());
       await tester.pumpAndSettle();
 
@@ -220,17 +312,6 @@ void main() {
   });
 
   group('Section A: Ticketing, Payment & QR Transit Flow Tests', () {
-    final sampleTicket = TicketModel(
-      id: 'TKT-1001',
-      origin: 'Uttara North',
-      destination: 'Motijheel',
-      passengerCount: 1,
-      farePerPerson: 60,
-      totalFare: 60,
-      status: TicketStatus.available,
-      purchaseTime: DateTime(2026, 9, 15, 8, 30),
-    );
-
     testWidgets('TicketDetailsScreen renders 1:1 details, notch sections, and refund modal', (WidgetTester tester) async {
       bool refundCalled = false;
 
@@ -756,34 +837,20 @@ void main() {
       await tester.pumpWidget(const DmrtApp());
       await tester.pumpAndSettle();
 
-      // 1. Go to Profile Tab
-      await tester.tap(find.text('Profile'));
-      await tester.pumpAndSettle();
-      expect(find.text('Full Name'), findsOneWidget);
-
-      // 2. Open Side Menu Drawer
-      await tester.tap(find.byIcon(Icons.menu));
-      await tester.pumpAndSettle();
-      expect(find.text('Menu'), findsOneWidget);
-
-      // 3. Scroll and Tap "Phone Login Page" in drawer
-      await tester.drag(find.byType(ListView).last, const Offset(0, -200));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Phone Login Page'));
-      await tester.pumpAndSettle();
+      // 1. Clean launch starts directly on PhoneLoginScreen
       expect(find.text('Enter your phone number'), findsOneWidget);
 
-      // 4. Enter any random Bangladesh phone number (11 digits)
+      // 2. Enter Bangladesh phone number (11 digits)
       await tester.enterText(find.byType(TextField), '01987654321');
       await tester.pumpAndSettle();
 
-      // Tap Next
+      // 3. Tap Next
       await tester.tap(find.text('Next'));
       await tester.pumpAndSettle();
       expect(find.text('Verify your number'), findsOneWidget);
       expect(find.text('Enter the 6-digit code sent to +880 01987-654321'), findsOneWidget);
 
-      // 5. Enter dummy OTP 000000
+      // 4. Enter test OTP 000000
       final otpFields = find.byType(TextField);
       expect(otpFields, findsNWidgets(6));
       for (int i = 0; i < 6; i++) {
@@ -793,22 +860,22 @@ void main() {
       await tester.pump(const Duration(milliseconds: 1200));
       await tester.pumpAndSettle();
 
-      // 6. Profile Setup Screen
+      // 5. Profile Setup Screen appears
       expect(find.text('Set up your profile'), findsOneWidget);
       await tester.enterText(find.byType(TextField), 'Farhan Kabir');
       await tester.pumpAndSettle();
       await tester.tap(find.text('Get Started'));
       await tester.pumpAndSettle();
 
-      // 7. Landed back on Home Screen with updated user greeting
+      // 6. Landed on Home Screen with updated user greeting
       expect(find.textContaining('Farhan'), findsWidgets);
 
-      // 8. Go to Profile screen and verify updated profile
+      // 7. Go to Profile screen and verify updated profile
       await tester.tap(find.byIcon(Icons.person).first);
       await tester.pumpAndSettle();
       expect(find.text('Farhan Kabir'), findsWidgets);
 
-      // 9. Open Side Menu and Trigger Logout
+      // 8. Open Side Menu and Trigger Logout
       await tester.tap(find.byIcon(Icons.menu));
       await tester.pumpAndSettle();
       await tester.drag(find.byType(ListView).last, const Offset(0, -300));
@@ -821,7 +888,7 @@ void main() {
       await tester.tap(find.text('Logout').last);
       await tester.pumpAndSettle();
 
-      // 10. Successfully logged out and redirected to Phone Login
+      // 9. Successfully logged out and redirected to Phone Login
       expect(find.text('Enter your phone number'), findsOneWidget);
     });
   });
@@ -883,6 +950,7 @@ void main() {
       addTearDown(tester.view.resetPhysicalSize);
       addTearDown(tester.view.resetDevicePixelRatio);
 
+      await seedAuthenticatedUser(tickets: [sampleTicket]);
       await tester.pumpWidget(const DmrtApp());
       await tester.pumpAndSettle();
 
@@ -931,6 +999,7 @@ void main() {
     });
 
     testWidgets('Bottom Nav Bar Scan FAB respects riding and available states', (WidgetTester tester) async {
+      await seedAuthenticatedUser(tickets: [sampleTicket]);
       await tester.pumpWidget(const DmrtApp());
       await tester.pump(const Duration(milliseconds: 300));
 
@@ -945,6 +1014,7 @@ void main() {
     });
 
     testWidgets('PopScope back navigation unwinds active screens back to Home', (WidgetTester tester) async {
+      await seedAuthenticatedUser();
       await tester.pumpWidget(const DmrtApp());
       await tester.pumpAndSettle();
 
@@ -968,6 +1038,7 @@ void main() {
       addTearDown(tester.view.resetPhysicalSize);
       addTearDown(tester.view.resetDevicePixelRatio);
 
+      await seedAuthenticatedUser(tickets: [sampleTicket]);
       await tester.pumpWidget(const DmrtApp());
       await tester.pumpAndSettle();
 
@@ -1042,22 +1113,22 @@ void main() {
       expect(loadedProfile.gender, 'female');
       expect(loadedProfile.avatarUrl, 'data:image/jpeg;base64,dGVzdA==');
 
-      final initialTickets = TicketModel.getInitialTickets();
-      await storage.saveTickets(initialTickets);
+      final testTickets = [sampleTicket];
+      await storage.saveTickets(testTickets);
       final loadedTickets = storage.loadTickets();
       expect(loadedTickets, isNotNull);
-      expect(loadedTickets!.length, initialTickets.length);
-      expect(loadedTickets.first.id, initialTickets.first.id);
-      expect(loadedTickets.first.origin, initialTickets.first.origin);
-      expect(loadedTickets.first.destination, initialTickets.first.destination);
+      expect(loadedTickets!.length, testTickets.length);
+      expect(loadedTickets.first.id, testTickets.first.id);
+      expect(loadedTickets.first.origin, testTickets.first.origin);
+      expect(loadedTickets.first.destination, testTickets.first.destination);
 
-      final initialHistory = TicketModel.getInitialHistory();
-      await storage.saveHistory(initialHistory);
+      final testHistory = sampleHistory;
+      await storage.saveHistory(testHistory);
       final loadedHistory = storage.loadHistory();
       expect(loadedHistory, isNotNull);
-      expect(loadedHistory!.length, initialHistory.length);
-      expect(loadedHistory.first.id, initialHistory.first.id);
-      expect(loadedHistory.first.status, initialHistory.first.status);
+      expect(loadedHistory!.length, testHistory.length);
+      expect(loadedHistory.first.id, testHistory.first.id);
+      expect(loadedHistory.first.status, testHistory.first.status);
 
       await storage.saveAuthState(isAuthenticated: true, phoneNumber: '+880 1811-223344');
       expect(storage.loadIsAuthenticated(), isTrue);
@@ -1170,4 +1241,3 @@ void main() {
     });
   });
 }
-

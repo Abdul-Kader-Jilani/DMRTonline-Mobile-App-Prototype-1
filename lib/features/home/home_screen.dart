@@ -51,10 +51,14 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   int _currentNavIndex = 0;
   int _historyInitialTab = 0;
-  UserProfileModel _userProfile = const UserProfileModel();
+  UserProfileModel _userProfile = const UserProfileModel(
+    fullName: 'Metro Commuter',
+    phoneNumber: '',
+    email: '',
+  );
 
-  List<TicketModel> _tickets = TicketModel.getInitialTickets();
-  List<TicketModel> _history = TicketModel.getInitialHistory();
+  List<TicketModel> _tickets = [];
+  List<TicketModel> _history = [];
 
   // Active full screen overlays in Section A
   TicketModel? _activeDetailTicket;
@@ -73,30 +77,40 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _loadPersistedData() async {
     final storage = await AppStorageService.getInstance();
+    final isAuth = storage.loadIsAuthenticated();
     final profile = storage.loadUserProfile();
-    final savedTickets = storage.loadTickets();
-    final savedHistory = storage.loadHistory();
+    final savedTickets = storage.loadTickets() ?? [];
+    final savedHistory = storage.loadHistory() ?? [];
 
     if (mounted) {
       setState(() {
-        if (profile != null) {
+        if (!isAuth || profile == null || profile.phoneNumber.isEmpty) {
+          _activeAuthScreen = 'phone';
+          _userProfile = const UserProfileModel(
+            fullName: 'Metro Commuter',
+            phoneNumber: '',
+            email: '',
+          );
+          _tickets = [];
+          _history = [];
+        } else {
+          _activeAuthScreen = null;
           _userProfile = profile;
-        }
-        if (savedTickets != null) {
           _tickets = savedTickets;
-        }
-        if (savedHistory != null) {
           _history = savedHistory;
         }
       });
     }
 
-    _syncWithSupabase();
+    if (isAuth && profile != null && profile.phoneNumber.isNotEmpty) {
+      _syncWithSupabase();
+    }
   }
 
   Future<void> _syncWithSupabase() async {
+    final phone = _userProfile.phoneNumber;
+    if (phone.isEmpty || !SupabaseService.instance.isInitialized) return;
     try {
-      final phone = _userProfile.phoneNumber;
       final serverProfile = await SupabaseService.instance.getOrCreatePassenger(phoneNumber: phone);
       final serverTickets = await SupabaseService.instance.fetchLiveTickets(phone);
       final serverHistory = await SupabaseService.instance.fetchTripHistory(phone);
@@ -106,15 +120,13 @@ class _HomeScreenState extends State<HomeScreen> {
           if (serverProfile != null) {
             _userProfile = serverProfile;
           }
-          if (serverTickets.isNotEmpty) {
-            _tickets = serverTickets;
-          }
-          if (serverHistory.isNotEmpty) {
-            _history = serverHistory;
-          }
+          _tickets = serverTickets;
+          _history = serverHistory;
         });
         _saveTicketsAndHistory();
-        _saveProfile(_userProfile);
+        if (serverProfile != null) {
+          _saveProfile(_userProfile);
+        }
       }
     } catch (e) {
       debugPrint('[HomeScreen] Supabase sync background note: $e');
