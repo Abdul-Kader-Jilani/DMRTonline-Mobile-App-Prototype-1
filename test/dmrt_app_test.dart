@@ -1176,8 +1176,8 @@ void main() {
       expect(service, isNotNull);
 
       // Verify OTP verification with test code 000000
-      final isVerified = await service.verifyOtp(phoneNumber: '01700000000', otp: '000000');
-      expect(isVerified, isTrue);
+      final verifyRes = await service.verifyOtp(phoneNumber: '01700000000', otp: '000000');
+      expect(verifyRes != null && verifyRes['verified'] == true, isTrue);
 
       // Verify requestOtp returns valid map structure
       final otpRes = await service.requestOtp('01700000000');

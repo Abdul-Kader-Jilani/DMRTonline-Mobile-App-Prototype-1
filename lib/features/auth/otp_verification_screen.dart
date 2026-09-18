@@ -145,10 +145,11 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
 
     bool isValid = code == '000000';
     if (!isValid) {
-      isValid = await SupabaseService.instance.verifyOtp(
+      final res = await SupabaseService.instance.verifyOtp(
         phoneNumber: widget.phone,
         otp: code,
       );
+      isValid = res != null && res['verified'] == true;
     }
 
     if (isValid) {

@@ -514,10 +514,28 @@ class _HomeScreenState extends State<HomeScreen> {
       return OtpVerificationScreen(
         phone: _authPendingPhone ?? _userProfile.phoneNumber,
         onBack: () => setState(() => _activeAuthScreen = 'phone'),
-        onVerified: () {
-          setState(() {
-            _activeAuthScreen = 'setup';
-          });
+        onVerified: () async {
+          final phone = _authPendingPhone ?? _userProfile.phoneNumber;
+          final serverProfile = await SupabaseService.instance.getOrCreatePassenger(phoneNumber: phone);
+          final updated = serverProfile ?? _userProfile.copyWith(phoneNumber: phone);
+
+          if (updated.fullName.isNotEmpty && updated.fullName != 'Metro Commuter') {
+            setState(() {
+              _userProfile = updated;
+              _activeAuthScreen = null;
+              _currentNavIndex = 0;
+            });
+            await _saveProfile(updated);
+            final storage = await AppStorageService.getInstance();
+            await storage.saveAuthState(isAuthenticated: true, phoneNumber: updated.phoneNumber);
+            _showToast('Welcome back, ${updated.fullName.split(' ').first}!');
+            _syncWithSupabase();
+          } else {
+            setState(() {
+              _userProfile = updated;
+              _activeAuthScreen = 'setup';
+            });
+          }
         },
       );
     }

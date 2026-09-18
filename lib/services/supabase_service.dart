@@ -42,11 +42,14 @@ class SupabaseService {
 
   /// Requests or provisions an OTP in the authentications table for phone authentication
   Future<Map<String, dynamic>?> requestOtp(String phoneNumber) async {
-    if (!_isInitialized) return {'success': true, 'otp': '000000'};
-    try {
-      final cleanPhone = phoneNumber.replaceAll(RegExp(r'[^0-9]'), '');
-      if (cleanPhone.isEmpty) return null;
+    final cleanPhone = phoneNumber.replaceAll(RegExp(r'[^0-9]'), '');
+    if (cleanPhone.isEmpty) return null;
 
+    if (!_isInitialized) {
+      return {'success': true, 'otp': '000000', 'phone_number': cleanPhone};
+    }
+
+    try {
       final result = await client.rpc('rpc_request_otp', params: {
         'p_phone_number': cleanPhone,
       });
@@ -54,24 +57,36 @@ class SupabaseService {
       if (result != null) {
         return Map<String, dynamic>.from(result as Map);
       }
-      return {'success': true, 'otp': '000000'};
+      return {'success': true, 'otp': '000000', 'phone_number': cleanPhone};
     } catch (e) {
       debugPrint('[SupabaseService] requestOtp error: $e');
-      return {'success': true, 'otp': '000000'};
+      return {'success': true, 'otp': '000000', 'phone_number': cleanPhone};
     }
   }
 
   /// Verifies the OTP against the authentications table
-  Future<bool> verifyOtp({
+  Future<Map<String, dynamic>?> verifyOtp({
     required String phoneNumber,
     required String otp,
   }) async {
-    if (otp == '000000') return true;
-    if (!_isInitialized) return otp == '000000';
-    try {
-      final cleanPhone = phoneNumber.replaceAll(RegExp(r'[^0-9]'), '');
-      if (cleanPhone.isEmpty) return false;
+    final cleanPhone = phoneNumber.replaceAll(RegExp(r'[^0-9]'), '');
+    if (cleanPhone.isEmpty) return null;
 
+    if (!_isInitialized) {
+      if (otp == '000000') {
+        return {
+          'verified': true,
+          'phone_number': cleanPhone,
+          'name': 'Dhaka Transit User',
+          'email': '$cleanPhone@dmrt.gov.bd',
+          'gender': 'male',
+          'dob': '1995-05-15',
+        };
+      }
+      return {'verified': false, 'message': 'Invalid OTP'};
+    }
+
+    try {
       final result = await client.rpc('rpc_verify_otp', params: {
         'p_phone_number': cleanPhone,
         'p_otp': otp,
@@ -79,12 +94,33 @@ class SupabaseService {
 
       if (result != null) {
         final map = Map<String, dynamic>.from(result as Map);
-        return map['verified'] == true;
+        return map;
       }
-      return otp == '000000';
+
+      if (otp == '000000') {
+        return {
+          'verified': true,
+          'phone_number': cleanPhone,
+          'name': 'Dhaka Transit User',
+          'email': '$cleanPhone@dmrt.gov.bd',
+          'gender': 'male',
+          'dob': '1995-05-15',
+        };
+      }
+      return {'verified': false, 'message': 'Invalid OTP'};
     } catch (e) {
       debugPrint('[SupabaseService] verifyOtp error: $e');
-      return otp == '000000';
+      if (otp == '000000') {
+        return {
+          'verified': true,
+          'phone_number': cleanPhone,
+          'name': 'Dhaka Transit User',
+          'email': '$cleanPhone@dmrt.gov.bd',
+          'gender': 'male',
+          'dob': '1995-05-15',
+        };
+      }
+      return {'verified': false, 'message': 'Verification failed'};
     }
   }
 
@@ -96,8 +132,8 @@ class SupabaseService {
     if (!_isInitialized) return null;
     try {
       final cleanPhone = phoneNumber.replaceAll(RegExp(r'[^0-9]'), '');
-      
-      // 1. Try to fetch existing
+      if (cleanPhone.isEmpty) return null;
+
       final response = await client
           .from('passengers')
           .select()
@@ -105,40 +141,34 @@ class SupabaseService {
           .maybeSingle();
 
       if (response != null) {
-        final profile = UserProfileModel(
-          fullName: response['name'] as String? ?? 'Metro Commuter',
-          email: response['email'] as String? ?? 'commuter@dmrt.gov.bd',
-          phoneNumber: response['phone_number'] as String? ?? phoneNumber,
+        return UserProfileModel(
+          fullName: response['name'] as String? ?? 'Dhaka Transit User',
+          phoneNumber: cleanPhone,
+          email: response['email'] as String? ?? '$cleanPhone@dmrt.gov.bd',
           gender: response['gender'] as String? ?? 'male',
           dob: response['dob'] as String? ?? '1995-05-15',
-          avatarUrl: response['avatar_url'] as String?,
         );
-        return profile;
       }
 
-      // 2. Create new passenger
-      final insertData = {
-        'phone_number': cleanPhone,
-        'name': name ?? 'Metro Commuter',
-        'email': '$cleanPhone@dmrt.gov.bd',
-        'gender': 'male',
-        'dob': '1995-05-15',
-        'flag': null,
-      };
-
+      // Create new passenger
       final inserted = await client
           .from('passengers')
-          .upsert(insertData, onConflict: 'phone_number')
+          .insert({
+            'phone_number': cleanPhone,
+            'name': name ?? 'Metro Commuter',
+            'email': '$cleanPhone@dmrt.gov.bd',
+            'gender': 'male',
+            'dob': '1995-05-15',
+          })
           .select()
           .single();
 
       return UserProfileModel(
         fullName: inserted['name'] as String? ?? 'Metro Commuter',
+        phoneNumber: cleanPhone,
         email: inserted['email'] as String? ?? '$cleanPhone@dmrt.gov.bd',
-        phoneNumber: inserted['phone_number'] as String? ?? phoneNumber,
         gender: inserted['gender'] as String? ?? 'male',
         dob: inserted['dob'] as String? ?? '1995-05-15',
-        avatarUrl: inserted['avatar_url'] as String?,
       );
     } catch (e) {
       debugPrint('[SupabaseService] getOrCreatePassenger error: $e');
@@ -146,18 +176,32 @@ class SupabaseService {
     }
   }
 
-  /// Updates passenger profile in Supabase
+  /// Updates passenger profile information in Supabase
   Future<bool> updatePassengerProfile(UserProfileModel profile) async {
     if (!_isInitialized) return false;
     try {
       final cleanPhone = profile.phoneNumber.replaceAll(RegExp(r'[^0-9]'), '');
-      await client.from('passengers').update({
-        'name': profile.fullName,
-        'email': profile.email,
-        'gender': profile.gender,
-        'dob': profile.dob.isNotEmpty ? profile.dob : null,
-      }).eq('phone_number', cleanPhone);
-      return true;
+      if (cleanPhone.isEmpty) return false;
+
+      // Look up passenger ID
+      final p = await client
+          .from('passengers')
+          .select('id')
+          .eq('phone_number', cleanPhone)
+          .maybeSingle();
+
+      if (p != null) {
+        final passengerId = p['id'] as String;
+        await client.rpc('rpc_update_passenger', params: {
+          'p_passenger_id': passengerId,
+          'p_name': profile.fullName,
+          'p_email': profile.email,
+          'p_gender': profile.gender,
+          'p_dob': profile.dob.isNotEmpty ? profile.dob : null,
+        });
+        return true;
+      }
+      return false;
     } catch (e) {
       debugPrint('[SupabaseService] updatePassengerProfile error: $e');
       return false;
@@ -166,7 +210,7 @@ class SupabaseService {
 
   // --- STATIONS & ROUTES ---
 
-  /// Fetches all 17 stations from Supabase
+  /// Fetches all stations sorted by sequence number
   Future<List<Map<String, dynamic>>> fetchStations() async {
     if (!_isInitialized) return [];
     try {
@@ -188,8 +232,8 @@ class SupabaseService {
     if (!_isInitialized) return [];
     try {
       final cleanPhone = phoneNumber.replaceAll(RegExp(r'[^0-9]'), '');
-      
-      // Get passenger
+      if (cleanPhone.isEmpty) return [];
+
       final passenger = await client
           .from('passengers')
           .select('id')
@@ -262,7 +306,8 @@ class SupabaseService {
     if (!_isInitialized) return null;
     try {
       final cleanPhone = phoneNumber.replaceAll(RegExp(r'[^0-9]'), '');
-      
+      if (cleanPhone.isEmpty) return null;
+
       // 1. Get or create passenger
       await getOrCreatePassenger(phoneNumber: cleanPhone);
       final passenger = await client
@@ -272,45 +317,31 @@ class SupabaseService {
           .single();
       final passengerId = passenger['id'] as String;
 
-      // 2. Resolve stations
-      final stations = await client.from('stations').select('id, station_name');
-      String? startId;
-      String? endId;
-
-      for (final s in stations) {
-        final name = s['station_name'] as String;
-        if (name.toLowerCase() == origin.toLowerCase()) startId = s['id'] as String;
-        if (name.toLowerCase() == destination.toLowerCase()) endId = s['id'] as String;
-      }
-
-      startId ??= '11111111-0001-0000-0000-000000000001';
-      endId ??= '11111111-0016-0000-0000-000000000016';
-
-      // 3. Call RPC
+      // 2. Call RPC
       final result = await client.rpc('rpc_buy_ticket', params: {
         'p_passenger_id': passengerId,
-        'p_start_station_id': startId,
-        'p_end_station_id': endId,
+        'p_origin_name': origin,
+        'p_destination_name': destination,
         'p_passenger_count': passengerCount,
-        'p_payment_method': paymentMethod.toUpperCase().contains('BKASH')
-            ? 'MFS'
-            : (paymentMethod.toUpperCase().contains('CARD') ? 'CARD' : 'MFS'),
+        'p_payment_method': paymentMethod,
       });
 
       if (result != null) {
         final map = Map<String, dynamic>.from(result as Map);
         final totalFare = (map['total_price'] as num?)?.toInt() ?? 60;
         final count = map['passenger_count'] as int? ?? passengerCount;
+        final unitPrice = (map['fare_per_person'] as num?)?.toInt() ?? (totalFare ~/ count);
 
         return TicketModel(
-          id: map['id'] as String? ?? 'TKT-${DateTime.now().millisecondsSinceEpoch}',
-          origin: map['start_station_name'] as String? ?? origin,
-          destination: map['end_station_name'] as String? ?? destination,
+          id: map['id'] as String,
+          origin: map['origin'] as String? ?? origin,
+          destination: map['destination'] as String? ?? destination,
           passengerCount: count,
-          farePerPerson: count > 0 ? (totalFare ~/ count) : totalFare,
+          farePerPerson: unitPrice,
           totalFare: totalFare,
           status: TicketStatus.available,
           purchaseTime: DateTime.parse(map['purchase_time'] as String? ?? DateTime.now().toIso8601String()),
+          paymentMethod: paymentMethod,
         );
       }
       return null;
@@ -328,6 +359,8 @@ class SupabaseService {
     if (!_isInitialized) return false;
     try {
       final cleanPhone = phoneNumber.replaceAll(RegExp(r'[^0-9]'), '');
+      if (cleanPhone.isEmpty) return false;
+
       final passenger = await client
           .from('passengers')
           .select('id')
@@ -337,18 +370,23 @@ class SupabaseService {
       if (passenger == null) return false;
       final passengerId = passenger['id'] as String;
 
-      await client.rpc('rpc_pass_entry_barrier', params: {
+      final result = await client.rpc('rpc_pass_entry_barrier', params: {
         'p_ticket_id': ticketId,
         'p_passenger_id': passengerId,
       });
-      return true;
+
+      if (result != null) {
+        final map = Map<String, dynamic>.from(result as Map);
+        return map['success'] == true;
+      }
+      return false;
     } catch (e) {
       debugPrint('[SupabaseService] passEntryBarrier error: $e');
       return false;
     }
   }
 
-  /// Passes the exit barrier, archives trip to archive_tickets, deletes from live_tickets
+  /// Passes the exit barrier, transitions ticket to archive_tickets (COMPLETED)
   Future<bool> passExitBarrier({
     required String ticketId,
     required String phoneNumber,
@@ -356,6 +394,8 @@ class SupabaseService {
     if (!_isInitialized) return false;
     try {
       final cleanPhone = phoneNumber.replaceAll(RegExp(r'[^0-9]'), '');
+      if (cleanPhone.isEmpty) return false;
+
       final passenger = await client
           .from('passengers')
           .select('id')
@@ -365,18 +405,23 @@ class SupabaseService {
       if (passenger == null) return false;
       final passengerId = passenger['id'] as String;
 
-      await client.rpc('rpc_pass_exit_barrier', params: {
+      final result = await client.rpc('rpc_pass_exit_barrier', params: {
         'p_ticket_id': ticketId,
         'p_passenger_id': passengerId,
       });
-      return true;
+
+      if (result != null) {
+        final map = Map<String, dynamic>.from(result as Map);
+        return map['success'] == true;
+      }
+      return false;
     } catch (e) {
       debugPrint('[SupabaseService] passExitBarrier error: $e');
       return false;
     }
   }
 
-  /// Requests refund for an unused ticket
+  /// Requests a refund for an available ticket (10% penalty fee)
   Future<bool> requestRefund({
     required String ticketId,
     required String phoneNumber,
@@ -384,6 +429,8 @@ class SupabaseService {
     if (!_isInitialized) return false;
     try {
       final cleanPhone = phoneNumber.replaceAll(RegExp(r'[^0-9]'), '');
+      if (cleanPhone.isEmpty) return false;
+
       final passenger = await client
           .from('passengers')
           .select('id')
@@ -393,22 +440,29 @@ class SupabaseService {
       if (passenger == null) return false;
       final passengerId = passenger['id'] as String;
 
-      await client.rpc('rpc_request_refund', params: {
+      final result = await client.rpc('rpc_request_refund', params: {
         'p_ticket_id': ticketId,
         'p_passenger_id': passengerId,
       });
-      return true;
+
+      if (result != null) {
+        final map = Map<String, dynamic>.from(result as Map);
+        return map['success'] == true;
+      }
+      return false;
     } catch (e) {
       debugPrint('[SupabaseService] requestRefund error: $e');
       return false;
     }
   }
 
-  /// Fetches trip history from archive_tickets
+  /// Fetches trip history from archive_tickets table
   Future<List<TicketModel>> fetchTripHistory(String phoneNumber) async {
     if (!_isInitialized) return [];
     try {
       final cleanPhone = phoneNumber.replaceAll(RegExp(r'[^0-9]'), '');
+      if (cleanPhone.isEmpty) return [];
+
       final passenger = await client
           .from('passengers')
           .select('id')
@@ -440,14 +494,15 @@ class SupabaseService {
         final route = item['routes'] as Map<String, dynamic>?;
         final startStation = route?['start_station'] as Map<String, dynamic>?;
         final endStation = route?['end_station'] as Map<String, dynamic>?;
-        final totalFare = (item['total_amount'] as num?)?.toInt() ?? 60;
+        final unitPrice = (route?['price'] as num?)?.toInt() ?? 60;
+        final totalFare = (item['total_amount'] as num?)?.toInt() ?? unitPrice;
         final count = item['passenger_count'] as int? ?? 1;
-        final statusStr = (item['status'] as String? ?? 'COMPLETED').toUpperCase();
+        final statusStr = item['status'] as String? ?? 'COMPLETED';
 
         TicketStatus status = TicketStatus.completed;
-        if (statusStr == 'EXPIRED') {
+        if (statusStr.toUpperCase() == 'EXPIRED') {
           status = TicketStatus.expired;
-        } else if (statusStr == 'REFUNDED') {
+        } else if (statusStr.toUpperCase() == 'REFUNDED') {
           status = TicketStatus.refunded;
         }
 
@@ -458,7 +513,7 @@ class SupabaseService {
           origin: startStation?['station_name'] as String? ?? 'Uttara North',
           destination: endStation?['station_name'] as String? ?? 'Motijheel',
           passengerCount: count,
-          farePerPerson: count > 0 ? (totalFare ~/ count) : totalFare,
+          farePerPerson: count > 0 ? (totalFare ~/ count) : unitPrice,
           totalFare: totalFare,
           status: status,
           purchaseTime: archivedAt.subtract(const Duration(minutes: 30)),
