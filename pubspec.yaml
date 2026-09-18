@@ -1,0 +1,36 @@
+name: dmrt_online
+description: "DMRT Online passenger prototype app."
+publish_to: 'none'
+
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.12.0
+
+dependencies:
+  flutter:
+    sdk: flutter
+  qr_flutter: ^4.1.0
+  intl: ^0.19.0
+  shared_preferences: ^2.2.3
+  image_picker: ^1.1.2
+  supabase_flutter: ^2.8.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.0
+
+flutter:
+  uses-material-design: true
+
+  assets:
+    - assets/index.html
+    - assets/dmrt/
+    - assets/fonts/
+
+  fonts:
+    - family: MaterialSymbols
+      fonts:
+        - asset: assets/fonts/material-symbols-outlined.ttf
+

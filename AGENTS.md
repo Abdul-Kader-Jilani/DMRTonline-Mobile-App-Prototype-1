@@ -1,0 +1,7 @@
+# Custom Rules for DMRT Online
+
+- **Asset Synchronization**: Always keep `Web Prototype/index.html` and bundled `DMRTonline Mobile App/assets/index.html` 100% synchronized after any HTML/CSS/JS edit. Also ensure all asset files in `Web Prototype/dmrt/` and `Web Prototype/fonts/` are copied to `DMRTonline Mobile App/assets/` and properly registered in `pubspec.yaml` under `flutter: assets:`.
+- **Project Context Memory**: Automatically update `Mobile App Context.md` inside `DMRTonline Mobile App/` and `System Architecture & Docs/` after completing visual, functional, structural, or configuration changes to the mobile app. For system-wide architectural reference, consult `System Architecture & Docs/Full Project Context.md`.
+- **Instant Viewer Auto-Update**: Automatically recompile the web bundle (`run_local.cmd build web --no-web-resources-cdn`) after any visual, functional, or UI edit in the Flutter app so the instant simulator (`run_instant_preview.cmd` / `http://localhost:8085`) is always immediately up to date without the user needing to ask.
+- **Phone Updates**: Only compile and deploy the Flutter app to the connected phone when the user explicitly requests it (e.g. "update in my phone" or "deploy to phone"). Do not run automatic phone update or build commands without an explicit user prompt.
+- **Stop Upgrade Sessions**: Do not keep mobile compile/upgrade background sessions running continuously. Once build or deployment commands finish, stop the session immediately.
