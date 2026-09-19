@@ -2313,6 +2313,27 @@ Future agents: append to this log whenever work is completed. Keep entries short
   2. **Cross-Platform Access**:
      - Fully accessible worldwide on any iPhone (Safari PWA), Android (Chrome PWA), or desktop browser with responsive Flutter CanvasKit rendering and automatic mobile full-screen detection.
 
+### Checkpoint 153: Transition to Email OTP Auth, Supabase Database Linking & Full QA Release
+- **Date**: September 19, 2026
+- **Status**: Implemented, Verified & Released
+- **Scope & Changes**:
+  1. **Commuter Email OTP Authentication**:
+     - Transitioned authentication from Phone Number to Email OTP across `EmailLoginScreen`, `OtpVerificationScreen`, and `HomeScreen`.
+     - Integrated Supabase native Auth (`signInWithOtp(email: ...)` & `verifyOTP(type: OtpType.email)`) with real 6-digit email OTP delivery.
+     - Included bypass code `000000` for offline testing and automated widget test harnesses.
+  2. **Supabase PostgreSQL Schema & Auth Linking**:
+     - `auth.users` linked 1:1 with `public.passengers` via `passengers.auth_id` (UUID FK) and `passengers.email` (UNIQUE).
+     - Deployed PostgreSQL trigger `handle_new_auth_user()` on `auth.users` (AFTER INSERT OR UPDATE OF email).
+     - Deployed stored procedures `rpc_get_or_create_passenger_by_email` and `rpc_update_passenger`.
+     - Normalized Bangladeshi phone numbers to strict 11 digits (`01XXXXXXXXX`).
+  3. **Profile Persistence & Cloud Sync**:
+     - Profile attributes (Full Name, Email, Phone Number, Gender, DOB, Avatar) persist across app launches and synchronize with Supabase PostgreSQL 17.
+  4. **Quality & Release Artifacts**:
+     - 100% automated test suite passing (35/35 tests) in `test/dmrt_app_test.dart`.
+     - Recompiled standalone Release APK: `DMRTonline Mobile App - Prototype 1/build/app/outputs/flutter-apk/app-release.apk` (67.1 MB).
+     - Recompiled production Web bundle: `DMRTonline Mobile App - Prototype 1/build/web`.
+     - Synchronized and pushed all code to GitHub repository `Abdul-Kader-Jilani/DMRTonline-Mobile-App-Prototype-1` (`main` branch).
+
 
 
 
