@@ -2351,6 +2351,25 @@ Future agents: append to this log whenever work is completed. Keep entries short
      - Recompiled production Web bundle: `DMRTonline Mobile App - Prototype 1/build/web`.
      - Synchronized and pushed all code to GitHub repository `Abdul-Kader-Jilani/DMRTonline-Mobile-App-Prototype-1`.
 
+### Checkpoint 155: Ticket Timeout Removal & Permanent Active QR State
+- **Date**: September 19, 2026
+- **Status**: Implemented, Verified & Released
+- **Scope & Changes**:
+  1. **Ticket Timeout & Expiration Removal**:
+     - Removed 60-second / 60-minute countdown timers, `_secondsLeft`, `_isExpired`, and expiration barriers in `QrDisplayScreen` (`lib/features/qr_transit/qr_display_screen.dart`).
+     - Replaced the countdown timer container with an active green status pill: `Active Ticket QR • Ready to Scan` with `Icons.check_circle` icon.
+     - QR code image remains at 100% crisp opacity without fading or expiring.
+     - Barrier action buttons always display `Tap to Pass Entry Barrier` (Entry mode) and `Tap to Pass Exit Barrier` (Exit mode).
+  2. **Automated Testing & Verification**:
+     - Updated automated test suite in `test/dmrt_app_test.dart` to verify `Active Ticket QR • Ready to Scan` and permanent barrier transitions.
+     - 100% automated test suite passing (39/39 tests).
+     - Static analysis clean (0 issues) with `flutter analyze`.
+  3. **Builds & Release Artifacts**:
+     - Recompiled standalone Release APK: `DMRTonline Mobile App - Prototype 1/build/app/outputs/flutter-apk/app-release.apk` (67.1 MB).
+     - Recompiled production Web bundle: `DMRTonline Mobile App - Prototype 1/build/web`.
+     - Synchronized and pushed all code to GitHub repository `Abdul-Kader-Jilani/DMRTonline-Mobile-App-Prototype-1`.
+
+
 
 
 

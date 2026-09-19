@@ -539,7 +539,7 @@ void main() {
       expect(purchasedTicket!.paymentMethod, 'Debit / Credit Card');
     });
 
-    testWidgets('QrDisplayScreen countdown timer and entry/exit gate flow', (WidgetTester tester) async {
+    testWidgets('QrDisplayScreen permanent active state and entry/exit gate flow', (WidgetTester tester) async {
       bool entryCalled = false;
       bool tripCompleted = false;
 
@@ -558,6 +558,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Show at Reader'), findsOneWidget);
+      expect(find.text('Active Ticket QR • Ready to Scan'), findsOneWidget);
       expect(find.text('Tap to Pass Entry Barrier'), findsOneWidget);
       expect(find.text('Uttara North'), findsOneWidget);
       expect(find.text('Motijheel'), findsOneWidget);

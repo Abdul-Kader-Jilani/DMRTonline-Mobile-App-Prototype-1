@@ -1,4 +1,3 @@
-import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import '../../shared/app_gradients.dart';
@@ -27,53 +26,6 @@ class QrDisplayScreen extends StatefulWidget {
 }
 
 class _QrDisplayScreenState extends State<QrDisplayScreen> {
-  Timer? _countdownTimer;
-  late int _secondsLeft;
-
-  @override
-  void initState() {
-    super.initState();
-    _initTimer();
-  }
-
-  void _initTimer() {
-    _countdownTimer?.cancel();
-    final expiryTime = widget.ticket.exitQrActive
-        ? widget.ticket.exitQrExpiryTime
-        : widget.ticket.qrExpiryTime;
-
-    if (expiryTime != null) {
-      final diff = expiryTime.difference(DateTime.now()).inSeconds;
-      _secondsLeft = diff > 0 ? diff : 0;
-    } else {
-      _secondsLeft = widget.ticket.qrDurationSeconds;
-    }
-
-    if (_secondsLeft > 0) {
-      _countdownTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
-        if (!mounted) {
-          timer.cancel();
-          return;
-        }
-        setState(() {
-          if (_secondsLeft > 0) {
-            _secondsLeft--;
-          } else {
-            _secondsLeft = 0;
-            timer.cancel();
-          }
-        });
-      });
-    }
-  }
-
-  @override
-  void dispose() {
-    _countdownTimer?.cancel();
-    super.dispose();
-  }
-
-  bool get _isExpired => _secondsLeft <= 0;
   bool get _isExitMode =>
       widget.ticket.status == TicketStatus.riding || widget.ticket.exitQrActive;
 
@@ -215,133 +167,104 @@ class _QrDisplayScreenState extends State<QrDisplayScreen> {
 
                   // 2.2 Passenger QR Code Card (.qr-code-area)
                   Center(
-                    child: AnimatedOpacity(
-                      opacity: _isExpired ? 0.3 : 1.0,
-                      duration: const Duration(milliseconds: 300),
-                      child: Container(
-                        width: 270,
-                        height: 270,
-                        padding: const EdgeInsets.all(20),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(
-                            color: const Color(0xFF006B56),
-                            width: 2,
+                    child: Container(
+                      width: 270,
+                      height: 270,
+                      padding: const EdgeInsets.all(20),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(
+                          color: const Color(0xFF006B56),
+                          width: 2,
+                        ),
+                        boxShadow: const [
+                          BoxShadow(
+                            color: Color(0x2600503A),
+                            blurRadius: 30,
+                            offset: Offset(0, 8),
                           ),
-                          boxShadow: const [
-                            BoxShadow(
-                              color: Color(0x2600503A),
-                              blurRadius: 30,
-                              offset: Offset(0, 8),
-                            ),
-                          ],
-                        ),
-                        child: Stack(
-                          alignment: Alignment.center,
-                          children: [
-                            // 4 Green Viewfinder Corners
-                            const Positioned(
-                              top: 0,
-                              left: 0,
-                              child: _ScanCorner(isTop: true, isLeft: true),
-                            ),
-                            const Positioned(
-                              top: 0,
-                              right: 0,
-                              child: _ScanCorner(isTop: true, isLeft: false),
-                            ),
-                            const Positioned(
-                              bottom: 0,
-                              left: 0,
-                              child: _ScanCorner(isTop: false, isLeft: true),
-                            ),
-                            const Positioned(
-                              bottom: 0,
-                              right: 0,
-                              child: _ScanCorner(isTop: false, isLeft: false),
-                            ),
+                        ],
+                      ),
+                      child: Stack(
+                        alignment: Alignment.center,
+                        children: [
+                          // 4 Green Viewfinder Corners
+                          const Positioned(
+                            top: 0,
+                            left: 0,
+                            child: _ScanCorner(isTop: true, isLeft: true),
+                          ),
+                          const Positioned(
+                            top: 0,
+                            right: 0,
+                            child: _ScanCorner(isTop: true, isLeft: false),
+                          ),
+                          const Positioned(
+                            bottom: 0,
+                            left: 0,
+                            child: _ScanCorner(isTop: false, isLeft: true),
+                          ),
+                          const Positioned(
+                            bottom: 0,
+                            right: 0,
+                            child: _ScanCorner(isTop: false, isLeft: false),
+                          ),
 
-                            // Crisp QR Code
-                            QrImageView(
-                              data: 'DMRT-${widget.ticket.id}-${widget.ticket.origin}-${widget.ticket.destination}-${widget.ticket.purchaseTime.millisecondsSinceEpoch}',
-                              version: QrVersions.auto,
-                              size: 200,
-                              eyeStyle: const QrEyeStyle(
-                                eyeShape: QrEyeShape.square,
-                                color: Color(0xFF005140),
-                              ),
-                              dataModuleStyle: const QrDataModuleStyle(
-                                dataModuleShape: QrDataModuleShape.square,
-                                color: Color(0xFF181C1A),
-                              ),
+                          // Crisp QR Code
+                          QrImageView(
+                            data: 'DMRT-${widget.ticket.id}-${widget.ticket.origin}-${widget.ticket.destination}-${widget.ticket.purchaseTime.millisecondsSinceEpoch}',
+                            version: QrVersions.auto,
+                            size: 200,
+                            eyeStyle: const QrEyeStyle(
+                              eyeShape: QrEyeShape.square,
+                              color: Color(0xFF005140),
                             ),
-                          ],
-                        ),
+                            dataModuleStyle: const QrDataModuleStyle(
+                              dataModuleShape: QrDataModuleShape.square,
+                              color: Color(0xFF181C1A),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ),
                   const SizedBox(height: 16),
 
-                  // 2.3 Timer Pill & Actions (.timer-section)
+                  // 2.3 Active Status Badge (.timer-section replaced with permanent active status)
                   Center(
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                       decoration: BoxDecoration(
-                        color: _isExpired
-                            ? const Color(0xFFBA1A1A)
-                            : const Color(0xFFE6E9E5), // var(--color-surface-high)
+                        color: const Color(0x1A006B56),
                         borderRadius: BorderRadius.circular(9999),
                         border: Border.all(
-                          color: _isExpired
-                              ? const Color(0xFFBA1A1A)
-                              : const Color(0xFFE0E3E0), // var(--color-surface-highest)
+                          color: const Color(0x33006B56),
                           width: 1,
                         ),
                       ),
-                      child: Row(
+                      child: const Row(
                         mainAxisSize: MainAxisSize.min,
+                        mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           Icon(
-                            Icons.timer,
+                            Icons.check_circle,
                             size: 18,
-                            color: _isExpired
-                                ? Colors.white
-                                : const Color(0xFF005140), // var(--color-primary)
+                            color: Color(0xFF005140),
                           ),
-                          const SizedBox(width: 8),
-                          if (_isExpired)
-                            const Text(
-                              'QR expired',
+                          SizedBox(width: 8),
+                          Flexible(
+                            child: Text(
+                              'Active Ticket QR • Ready to Scan',
                               style: TextStyle(
                                 fontFamily: 'Inter',
-                                fontSize: 16,
+                                fontSize: 14,
                                 fontWeight: FontWeight.w600,
-                                color: Colors.white,
+                                color: Color(0xFF005140),
                               ),
-                            )
-                          else ...[
-                            const Text(
-                              'Expires in ',
-                              style: TextStyle(
-                                fontFamily: 'Inter',
-                                fontSize: 16,
-                                fontWeight: FontWeight.w400,
-                                color: Color(0xFF3E4945), // var(--color-on-surface-variant)
-                              ),
+                              overflow: TextOverflow.ellipsis,
                             ),
-                            Text(
-                              '${_secondsLeft}s',
-                              style: TextStyle(
-                                fontFamily: 'Inter',
-                                fontSize: 18,
-                                fontWeight: FontWeight.w700,
-                                color: _secondsLeft <= 10
-                                    ? const Color(0xFFBA1A1A) // var(--color-error)
-                                    : const Color(0xFF005140), // var(--color-primary)
-                              ),
-                            ),
-                          ],
+                          ),
                         ],
                       ),
                     ),
@@ -400,136 +323,66 @@ class _QrDisplayScreenState extends State<QrDisplayScreen> {
 
   Widget _buildActionButtons() {
     if (_isExitMode) {
-      if (!_isExpired) {
-        return SizedBox(
-          width: double.infinity,
-          height: 48,
-          child: ElevatedButton.icon(
-            onPressed: () => LoadingSceneOverlay.runWithLoading(
-              context,
-              'Passing through exit barrier...',
-              () => widget.onCompleteTrip(),
-            ),
-            icon: const Icon(Icons.sensor_door, size: 20, color: Colors.white),
-            label: const Text(
-              'Tap to Pass Exit Barrier',
-              style: TextStyle(
-                fontFamily: 'Inter',
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-                color: Colors.white,
-              ),
-            ),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF005140),
-              elevation: 4,
-              shadowColor: const Color(0x33005140),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(9999),
-              ),
+      return SizedBox(
+        width: double.infinity,
+        height: 48,
+        child: ElevatedButton.icon(
+          onPressed: () => LoadingSceneOverlay.runWithLoading(
+            context,
+            'Passing through exit barrier...',
+            () => widget.onCompleteTrip(),
+          ),
+          icon: const Icon(Icons.sensor_door, size: 20, color: Colors.white),
+          label: const Text(
+            'Tap to Pass Exit Barrier',
+            style: TextStyle(
+              fontFamily: 'Inter',
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              color: Colors.white,
             ),
           ),
-        );
-      } else {
-        return SizedBox(
-          width: double.infinity,
-          height: 48,
-          child: ElevatedButton.icon(
-            onPressed: () => LoadingSceneOverlay.runWithLoading(
-              context,
-              'Regenerating QR code...',
-              () {
-                _initTimer();
-                widget.onRegenerateQr?.call();
-              },
-            ),
-            icon: const Icon(Icons.refresh, size: 20, color: Colors.white),
-            label: const Text(
-              'Regenerate Exit QR',
-              style: TextStyle(
-                fontFamily: 'Inter',
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-                color: Colors.white,
-              ),
-            ),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF005140),
-              elevation: 4,
-              shadowColor: const Color(0x33005140),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(9999),
-              ),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: const Color(0xFF005140),
+            elevation: 4,
+            shadowColor: const Color(0x33005140),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(9999),
             ),
           ),
-        );
-      }
+        ),
+      );
     } else {
       // Entry Mode
-      if (!_isExpired) {
-        return SizedBox(
-          width: double.infinity,
-          height: 48,
-          child: ElevatedButton.icon(
-            onPressed: () => LoadingSceneOverlay.runWithLoading(
-              context,
-              'Passing through entry barrier...',
-              () => widget.onPassEntryBarrier?.call(),
-            ),
-            icon: const Icon(Icons.sensor_door, size: 20, color: Colors.white),
-            label: const Text(
-              'Tap to Pass Entry Barrier',
-              style: TextStyle(
-                fontFamily: 'Inter',
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-                color: Colors.white,
-              ),
-            ),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF005140),
-              elevation: 4,
-              shadowColor: const Color(0x33005140),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(9999),
-              ),
+      return SizedBox(
+        width: double.infinity,
+        height: 48,
+        child: ElevatedButton.icon(
+          onPressed: () => LoadingSceneOverlay.runWithLoading(
+            context,
+            'Passing through entry barrier...',
+            () => widget.onPassEntryBarrier?.call(),
+          ),
+          icon: const Icon(Icons.sensor_door, size: 20, color: Colors.white),
+          label: const Text(
+            'Tap to Pass Entry Barrier',
+            style: TextStyle(
+              fontFamily: 'Inter',
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              color: Colors.white,
             ),
           ),
-        );
-      } else {
-        return SizedBox(
-          width: double.infinity,
-          height: 48,
-          child: ElevatedButton.icon(
-            onPressed: () => LoadingSceneOverlay.runWithLoading(
-              context,
-              'Regenerating QR code...',
-              () {
-                _initTimer();
-                widget.onRegenerateQr?.call();
-              },
-            ),
-            icon: const Icon(Icons.refresh, size: 20, color: Colors.white),
-            label: const Text(
-              'Regenerate QR Code',
-              style: TextStyle(
-                fontFamily: 'Inter',
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-                color: Colors.white,
-              ),
-            ),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF005140),
-              elevation: 4,
-              shadowColor: const Color(0x33005140),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(9999),
-              ),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: const Color(0xFF005140),
+            elevation: 4,
+            shadowColor: const Color(0x33005140),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(9999),
             ),
           ),
-        );
-      }
+        ),
+      );
     }
   }
 }
