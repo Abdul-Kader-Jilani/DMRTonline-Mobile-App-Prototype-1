@@ -38,11 +38,23 @@ class SupabaseService {
     }
   }
 
+  /// Normalizes any raw phone input to standard 11-digit Bangladesh phone number
+  static String normalizePhone(String raw) {
+    var clean = raw.replaceAll(RegExp(r'[^0-9]'), '');
+    if (clean.length >= 11) {
+      clean = clean.substring(clean.length - 11);
+    }
+    if (!clean.startsWith('0') && clean.length == 10) {
+      clean = '0$clean';
+    }
+    return clean;
+  }
+
   // --- PASSENGER & AUTH ---
 
   /// Requests or provisions an OTP in the authentications table for phone authentication
   Future<Map<String, dynamic>?> requestOtp(String phoneNumber) async {
-    final cleanPhone = phoneNumber.replaceAll(RegExp(r'[^0-9]'), '');
+    final cleanPhone = normalizePhone(phoneNumber);
     if (cleanPhone.isEmpty) return null;
 
     if (!_isInitialized) {
@@ -69,7 +81,7 @@ class SupabaseService {
     required String phoneNumber,
     required String otp,
   }) async {
-    final cleanPhone = phoneNumber.replaceAll(RegExp(r'[^0-9]'), '');
+    final cleanPhone = normalizePhone(phoneNumber);
     if (cleanPhone.isEmpty) return null;
 
     if (!_isInitialized) {
@@ -131,7 +143,7 @@ class SupabaseService {
   }) async {
     if (!_isInitialized) return null;
     try {
-      final cleanPhone = phoneNumber.replaceAll(RegExp(r'[^0-9]'), '');
+      final cleanPhone = normalizePhone(phoneNumber);
       if (cleanPhone.isEmpty) return null;
 
       final response = await client
@@ -180,7 +192,7 @@ class SupabaseService {
   Future<bool> updatePassengerProfile(UserProfileModel profile) async {
     if (!_isInitialized) return false;
     try {
-      final cleanPhone = profile.phoneNumber.replaceAll(RegExp(r'[^0-9]'), '');
+      final cleanPhone = normalizePhone(profile.phoneNumber);
       if (cleanPhone.isEmpty) return false;
 
       // Look up passenger ID
@@ -199,6 +211,7 @@ class SupabaseService {
           'p_gender': profile.gender,
           'p_dob': profile.dob.isNotEmpty ? profile.dob : null,
         });
+        debugPrint('[SupabaseService] Passenger profile updated in database successfully: ${profile.fullName}');
         return true;
       }
       return false;

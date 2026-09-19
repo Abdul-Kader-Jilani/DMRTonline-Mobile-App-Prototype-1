@@ -372,9 +372,10 @@ class _HomeScreenState extends State<HomeScreen> {
       case 3:
         return ProfileScreen(
           initialProfile: _userProfile,
-          onProfileSaved: (updated) {
+          onProfileSaved: (updated) async {
             setState(() => _userProfile = updated);
-            _saveProfile(updated);
+            await _saveProfile(updated);
+            await SupabaseService.instance.updatePassengerProfile(updated);
           },
           onLogout: () async {
             final emptyProfile = const UserProfileModel(
