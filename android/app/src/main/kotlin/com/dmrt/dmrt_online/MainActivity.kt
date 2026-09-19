@@ -4,6 +4,9 @@ import android.content.pm.PackageManager
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 
+import io.flutter.plugin.common.MethodChannel
+import android.view.WindowManager
+
 class MainActivity : FlutterActivity() {
     override fun onCreate(savedInstanceState: android.os.Bundle?) {
         super.onCreate(savedInstanceState)
@@ -26,6 +29,20 @@ class MainActivity : FlutterActivity() {
             .platformViewsController
             .registry
             .registerViewFactory("dmrt_online/prototype_webview", DmrtWebViewFactory(this))
+
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "dmrt.security/screen").setMethodCallHandler { call, result ->
+            when (call.method) {
+                "enableSecure" -> {
+                    activity?.window?.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
+                    result.success(true)
+                }
+                "disableSecure" -> {
+                    activity?.window?.clearFlags(WindowManager.LayoutParams.FLAG_SECURE)
+                    result.success(true)
+                }
+                else -> result.notImplemented()
+            }
+        }
     }
 
     override fun onBackPressed() {

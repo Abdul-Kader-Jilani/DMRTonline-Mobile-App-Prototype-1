@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import '../../shared/app_gradients.dart';
 import '../../shared/models/ticket_model.dart';
+import '../../services/screen_security_service.dart';
 import '../profile/widgets/loading_scene_overlay.dart';
 
 /// 1:1 Strict Recreation of `#view-qr` from Web Prototype/index.html
@@ -26,6 +27,18 @@ class QrDisplayScreen extends StatefulWidget {
 }
 
 class _QrDisplayScreenState extends State<QrDisplayScreen> {
+  @override
+  void initState() {
+    super.initState();
+    ScreenSecurityService.enableSecureScreen();
+  }
+
+  @override
+  void dispose() {
+    ScreenSecurityService.disableSecureScreen();
+    super.dispose();
+  }
+
   bool get _isExitMode =>
       widget.ticket.status == TicketStatus.riding || widget.ticket.exitQrActive;
 

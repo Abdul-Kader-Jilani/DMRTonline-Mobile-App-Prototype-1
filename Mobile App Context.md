@@ -2368,14 +2368,25 @@ Future agents: append to this log whenever work is completed. Keep entries short
      - Recompiled standalone Release APK: `DMRTonline Mobile App - Prototype 1/build/app/outputs/flutter-apk/app-release.apk` (67.1 MB).
      - Recompiled production Web bundle: `DMRTonline Mobile App - Prototype 1/build/web`.
      - Synchronized and pushed all code to GitHub repository `Abdul-Kader-Jilani/DMRTonline-Mobile-App-Prototype-1`.
-
-
-
-
-
-
-
-
-
-
-
+### Checkpoint 156: Event Row Unification, FLAG_SECURE Screenshot Blocking, 3 Demo Users & ERD Schema Polish
+- **Date**: September 19, 2026
+- **Status**: Implemented, Verified & Released
+- **Scope & Changes**:
+  1. **Event Row Unification in PostgreSQL**:
+     - Updated `rpc_pass_exit_barrier` stored procedure in Supabase PostgreSQL to update the existing `events` row (`entry_at`, `exit_at`, `last_event = 'EXIT'`) for a given ticket rather than inserting a duplicate row.
+  2. **Screenshot & Screen Recording Blocking (FLAG_SECURE)**:
+     - Implemented `ScreenSecurityService` in `lib/services/screen_security_service.dart`.
+     - Integrated `FLAG_SECURE` window flags in Android native `MainActivity.kt` via `MethodChannel('dmrt.security/screen')`.
+     - Activated in `QrDisplayScreen` `initState()` and cleared on `dispose()` to prevent unauthorized screenshots or screen capture of active QR tickets.
+  3. **Ticket Card Refund Button UX**:
+     - Updated small "Refund" button callback on Home ticket cards (`TicketCardWidget`) to open `TicketDetailsScreen` instead of immediately executing a direct refund.
+  4. **Database Schema Polish**:
+     - Removed `time_limit_minutes` column from `fines` table in Supabase PostgreSQL (`ALTER TABLE public.fines DROP COLUMN IF EXISTS time_limit_minutes;`).
+     - Fixed `rpc_get_or_create_passenger_by_email` to safely handle unassigned record initialization in PL/pgSQL.
+  5. **3 Realistic Demo Users Seeded in Supabase**:
+     - Seeded `demouser01@gmail.com` (Demo User 01), `demouser02@gmail.com` (Demo User 02), and `demouser03@gmail.com` (Demo User 03) with realistic phone numbers, DOB, gender, and full record history across `live_tickets`, `archive_tickets` (completed, expired, refunded), `payments`, `refunds`, and `events`.
+     - Updated logout flow in `HomeScreen` to clear user cache so switching accounts instantly loads the selected user's cloud data from Supabase with testing OTP `000000`.
+  6. **Documentation & Release Artifacts**:
+     - Generated standalone, 1-page PDF `Project_Progress_Report.pdf` and visual `Database_ERD_Diagram.pdf`.
+     - Updated Web & PWA distribution bundle `DMRTonline_Prototype1_Web_PWA.zip`.
+     - 100% automated test suite passing (39/39 tests) and static analysis clean.

@@ -348,7 +348,11 @@ class _HomeScreenState extends State<HomeScreen> {
               },
             );
           },
-          onRefund: () => _handleRefundTicket(ticket),
+          onRefund: () {
+            setState(() {
+              _activeDetailTicket = ticket;
+            });
+          },
         );
       },
     );
@@ -407,12 +411,19 @@ class _HomeScreenState extends State<HomeScreen> {
             );
             setState(() {
               _userProfile = emptyProfile;
+              _tickets = [];
+              _history = [];
               _currentNavIndex = 0;
               _activeAuthScreen = 'email';
+              _activeDetailTicket = null;
+              _activeQrTicket = null;
+              _activePaymentData = null;
             });
             final storage = await AppStorageService.getInstance();
             await storage.saveUserProfile(emptyProfile);
             await storage.saveAuthState(isAuthenticated: false);
+            await storage.saveTickets([]);
+            await storage.saveHistory([]);
             _showToast('Logged out successfully!');
           },
           onOpenPhoneLogin: () {
