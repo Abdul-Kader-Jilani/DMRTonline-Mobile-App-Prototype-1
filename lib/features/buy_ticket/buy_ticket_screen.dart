@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
+import '../../services/network_service.dart';
 import '../../shared/app_gradients.dart';
 import '../payment/widgets/payment_method_sheet.dart';
+import '../profile/widgets/loading_scene_overlay.dart';
 import 'models/station_data.dart';
+import 'widgets/no_internet_dialog.dart';
 import 'widgets/station_picker_bottom_sheet.dart';
 
 /// 1:1 Strict Recreation of `#view-buy` from Web Prototype/index.html
@@ -107,7 +110,26 @@ class _BuyTicketScreenState extends State<BuyTicketScreen> {
       return;
     }
 
-    // Open Payment Method Picker sheet (matches Web Prototype purchaseGroupTicket -> openPaymentMethodPicker)
+    // 1. Verify real-time internet connectivity with loading overlay (matches Web Prototype)
+    bool isOnline = false;
+    await LoadingSceneOverlay.runWithLoading(
+      context,
+      'Verifying network connection...',
+      () async {
+        isOnline = await NetworkService.hasInternetConnection();
+      },
+      delay: const Duration(milliseconds: 600),
+    );
+
+    if (!mounted) return;
+
+    // 2. Block offline ticket purchase and present NoInternetDialog
+    if (!isOnline) {
+      await NoInternetDialog.show(context);
+      return;
+    }
+
+    // 3. Device is online: Open Payment Method Picker sheet
     final chosen = await PaymentMethodSheet.show(context, selectedKey: 'mfs');
     if (chosen != null && mounted) {
       final methodTitle = chosen.key == 'mfs'

@@ -2334,6 +2334,23 @@ Future agents: append to this log whenever work is completed. Keep entries short
      - Recompiled production Web bundle: `DMRTonline Mobile App - Prototype 1/build/web`.
      - Synchronized and pushed all code to GitHub repository `Abdul-Kader-Jilani/DMRTonline-Mobile-App-Prototype-1` (`main` branch).
 
+### Checkpoint 154: Offline Ticket Purchase Restriction & 1:1 NoInternetDialog Integration
+- **Date**: September 19, 2026
+- **Status**: Implemented, Verified & Released
+- **Scope & Changes**:
+  1. **Real-Time Internet Verification on Ticket Purchase**:
+     - Integrated `NetworkService.hasInternetConnection()` in `BuyTicketScreen._handleProceedToPayment()`.
+     - Displays `LoadingSceneOverlay` ("Verifying network connection...") before initiating purchase.
+     - Blocks transition to payment when offline and displays `NoInternetDialog`.
+  2. **1:1 Strict `NoInternetDialog` Implementation**:
+     - Created `lib/features/buy_ticket/widgets/no_internet_dialog.dart` matching `#no-internet-overlay` from `Web Prototype/index.html`.
+     - Features red `wifi_off` circle icon badge (`#FEE2E2` / `#BA1A1A`), bold "No Internet Connection" title, warning text, and primary green "Understood" dismissal button.
+  3. **Quality & Automated Testing**:
+     - 100% automated test suite passing (39/39 tests) in `test/dmrt_app_test.dart`.
+     - Recompiled standalone Release APK: `DMRTonline Mobile App - Prototype 1/build/app/outputs/flutter-apk/app-release.apk` (67.1 MB).
+     - Recompiled production Web bundle: `DMRTonline Mobile App - Prototype 1/build/web`.
+     - Synchronized and pushed all code to GitHub repository `Abdul-Kader-Jilani/DMRTonline-Mobile-App-Prototype-1`.
+
 
 
 

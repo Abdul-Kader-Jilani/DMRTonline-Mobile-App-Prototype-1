@@ -3,9 +3,9 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:dmrt_online/main.dart';
 import 'package:dmrt_online/features/buy_ticket/models/station_data.dart';
 import 'package:dmrt_online/features/buy_ticket/buy_ticket_screen.dart';
+import 'package:dmrt_online/features/buy_ticket/widgets/no_internet_dialog.dart';
 import 'package:dmrt_online/features/ticket_details/ticket_details_screen.dart';
 import 'package:dmrt_online/features/payment/payment_screen.dart';
-import 'package:dmrt_online/features/payment/widgets/hold_to_confirm_button.dart';
 import 'package:dmrt_online/features/qr_transit/qr_display_screen.dart';
 import 'package:dmrt_online/features/qr_transit/widgets/ticket_select_dialog.dart';
 import 'package:dmrt_online/features/auth/email_login_screen.dart';
@@ -20,6 +20,7 @@ import 'package:dmrt_online/shared/dynamic_ticket_notch.dart';
 import 'package:dmrt_online/features/home/widgets/welcome_card.dart';
 import 'package:dmrt_online/features/profile/models/user_profile_model.dart';
 import 'package:dmrt_online/services/app_storage_service.dart';
+import 'package:dmrt_online/services/network_service.dart';
 import 'package:dmrt_online/services/supabase_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -214,6 +215,123 @@ void main() {
       // Modal closed, Buy Ticket screen displays both stations and fare
       expect(find.text('Uttara North'), findsOneWidget);
       expect(find.text('Mirpur 11'), findsOneWidget);
+    });
+
+    testWidgets('NoInternetDialog renders 1:1 error modal and dismisses on Understood tap', (WidgetTester tester) async {
+      bool dismissed = false;
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: NoInternetDialog(
+              onDismiss: () => dismissed = true,
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byIcon(Icons.wifi_off), findsOneWidget);
+      expect(find.text('No Internet Connection'), findsOneWidget);
+      expect(find.text('You are currently offline. Tickets cannot be purchased without an active internet connection. Please connect to the internet and try again.'), findsOneWidget);
+      expect(find.text('Understood'), findsOneWidget);
+
+      await tester.tap(find.text('Understood'));
+      await tester.pumpAndSettle();
+
+      expect(dismissed, isTrue);
+    });
+
+    testWidgets('BuyTicketScreen blocks ticket purchase when offline and displays NoInternetDialog', (WidgetTester tester) async {
+      NetworkService.mockIsOnline = false;
+
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: Scaffold(
+            body: BuyTicketScreen(),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Select stations
+      await tester.tap(find.text('Select Origin'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Uttara North'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Mirpur 11'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('OK'));
+      await tester.pumpAndSettle();
+
+      // Tap Proceed to Payment
+      await tester.drag(find.byType(ListView), const Offset(0, -300));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Proceed to Payment'));
+      await tester.pump(const Duration(milliseconds: 700));
+      await tester.pumpAndSettle();
+
+      // Should display NoInternetDialog
+      expect(find.text('No Internet Connection'), findsOneWidget);
+      expect(find.text('Understood'), findsOneWidget);
+
+      // Dismiss dialog
+      await tester.tap(find.text('Understood'));
+      await tester.pumpAndSettle();
+
+      // Back on BuyTicketScreen
+      expect(find.text('Proceed to Payment'), findsOneWidget);
+
+      NetworkService.mockIsOnline = null;
+    });
+
+    testWidgets('BuyTicketScreen proceeds to payment method sheet when online', (WidgetTester tester) async {
+      NetworkService.mockIsOnline = true;
+      bool proceedCalled = false;
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: BuyTicketScreen(
+              onProceedToPaymentWithMethod: (origin, dest, count, total, key, name) {
+                proceedCalled = true;
+              },
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Select stations
+      await tester.tap(find.text('Select Origin'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Uttara North'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Mirpur 11'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('OK'));
+      await tester.pumpAndSettle();
+
+      // Tap Proceed to Payment
+      await tester.drag(find.byType(ListView), const Offset(0, -300));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Proceed to Payment'));
+      await tester.pump(const Duration(milliseconds: 700));
+      await tester.pumpAndSettle();
+
+      // Should open Choose Payment Method sheet
+      expect(find.text('Choose Payment Method'), findsOneWidget);
+      expect(find.text('Mobile Finance'), findsOneWidget);
+
+      // Select Mobile Finance
+      await tester.tap(find.text('Mobile Finance'));
+      await tester.pumpAndSettle();
+
+      expect(proceedCalled, isTrue);
+
+      NetworkService.mockIsOnline = null;
     });
 
     testWidgets('HistoryScreen renders tabs and cards correctly', (WidgetTester tester) async {
@@ -1250,6 +1368,16 @@ void main() {
       final completed = riding.copyWith(status: TicketStatus.completed, completeTime: DateTime(2026, 9, 19, 10, 45));
       expect(completed.status, TicketStatus.completed);
       expect(completed.completeTime, isNotNull);
+    });
+
+    test('NetworkService returns mock value and handles offline state', () async {
+      NetworkService.mockIsOnline = true;
+      expect(await NetworkService.hasInternetConnection(), isTrue);
+
+      NetworkService.mockIsOnline = false;
+      expect(await NetworkService.hasInternetConnection(), isFalse);
+
+      NetworkService.mockIsOnline = null;
     });
   });
 }
