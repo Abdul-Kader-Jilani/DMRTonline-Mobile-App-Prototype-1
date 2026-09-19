@@ -4,15 +4,17 @@ import 'package:flutter/services.dart';
 import '../../services/supabase_service.dart';
 import '../../shared/app_gradients.dart';
 
-/// 1:1 Pure Recreation of `#view-auth-otp` from Web Prototype/index.html
+/// 1:1 Pure Recreation of `#view-auth-otp` from Web Prototype/index.html with Supabase Email OTP
 class OtpVerificationScreen extends StatefulWidget {
-  final String phone;
+  final String? email;
+  final String? phone;
   final VoidCallback onBack;
   final VoidCallback onVerified;
 
   const OtpVerificationScreen({
     super.key,
-    required this.phone,
+    this.email,
+    this.phone,
     required this.onBack,
     required this.onVerified,
   });
@@ -29,7 +31,10 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
   Timer? _resendTimer;
   String _errorText = '';
   bool _isVerified = false;
+  bool _isChecking = false;
   int _successWaveIndex = -1;
+
+  String get _displayTarget => widget.email ?? widget.phone ?? 'your email';
 
   @override
   void initState() {
@@ -101,7 +106,6 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
 
     // Multi-digit paste or multiple characters entered
     if (cleanDigits.length > 1) {
-      // If user typed into an already populated box, take the newest character
       if (value.length > 1 && cleanDigits.length == 2) {
         final lastChar = cleanDigits.substring(cleanDigits.length - 1);
         _controllers[index].text = lastChar;
@@ -141,15 +145,35 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
 
   Future<void> _verifyCode() async {
     final code = _controllers.map((c) => c.text).join();
-    if (code.length < 6) return;
+    if (code.length < 6 || _isChecking) return;
 
-    bool isValid = code == '000000';
-    if (!isValid) {
+    setState(() {
+      _isChecking = true;
+      _errorText = '';
+    });
+
+    bool isValid = false;
+
+    if (widget.email != null && widget.email!.isNotEmpty) {
+      final res = await SupabaseService.instance.verifyEmailOtp(
+        email: widget.email!,
+        otp: code,
+      );
+      isValid = res['verified'] == true;
+    } else if (widget.phone != null && widget.phone!.isNotEmpty) {
       final res = await SupabaseService.instance.verifyOtp(
-        phoneNumber: widget.phone,
+        phoneNumber: widget.phone!,
         otp: code,
       );
       isValid = res != null && res['verified'] == true;
+    } else {
+      isValid = code == '000000';
+    }
+
+    if (mounted) {
+      setState(() {
+        _isChecking = false;
+      });
     }
 
     if (isValid) {
@@ -177,7 +201,7 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
     } else {
       setState(() {
         _isVerified = false;
-        _errorText = 'Invalid OTP code. Use 000000 for testing.';
+        _errorText = 'Invalid OTP code. Please check your email inbox.';
       });
       // Keep cursor active on the last box so backspacing works immediately
       _focusNodes[5].requestFocus();
@@ -196,7 +220,11 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
       _successWaveIndex = -1;
     });
     _startResendTimer();
-    SupabaseService.instance.requestOtp(widget.phone);
+    if (widget.email != null && widget.email!.isNotEmpty) {
+      SupabaseService.instance.sendEmailOtp(widget.email!);
+    } else if (widget.phone != null && widget.phone!.isNotEmpty) {
+      SupabaseService.instance.requestOtp(widget.phone!);
+    }
     _focusNodes[0].requestFocus();
   }
 
@@ -214,188 +242,198 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
           child: SingleChildScrollView(
             padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
             child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              // Top Back button
-              Align(
-                alignment: Alignment.centerLeft,
-                child: IconButton(
-                  icon: const Icon(Icons.arrow_back, color: Color(0xFF005140)),
-                  onPressed: widget.onBack,
-                ),
-              ),
-              // DMRT Brand Logo (.auth-logo-section & .auth-logo-img)
-              Center(
-                child: Image.asset(
-                  'assets/dmrt/logo.png',
-                  height: 190,
-                  fit: BoxFit.contain,
-                  errorBuilder: (_, __, ___) => const Icon(
-                    Icons.directions_subway,
-                    size: 80,
-                    color: Color(0xFF005140),
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // Top Back button
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: IconButton(
+                    icon: const Icon(Icons.arrow_back, color: Color(0xFF005140)),
+                    onPressed: widget.onBack,
                   ),
                 ),
-              ),
-              const SizedBox(height: 12),
-
-              // Header Titles
-              const Text(
-                'Verify your number',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontFamily: 'Inter',
-                  fontSize: 22,
-                  fontWeight: FontWeight.w700,
-                  color: Color(0xFF181C1A),
-                ),
-              ),
-              const SizedBox(height: 6),
-              Text(
-                'Enter the 6-digit code sent to ${widget.phone}',
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  fontFamily: 'Inter',
-                  fontSize: 14,
-                  fontWeight: FontWeight.w400,
-                  color: Color(0xFF3E4945),
-                ),
-              ),
-              const SizedBox(height: 28),
-
-              // 6-digit OTP Box Inputs
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: List.generate(6, (idx) {
-                  final isSuccess = _isVerified && idx <= _successWaveIndex;
-                  final isError = _errorText.isNotEmpty;
-
-                  return Container(
-                    width: 44,
-                    height: 52,
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(
-                        color: isSuccess
-                            ? const Color(0xFF005140)
-                            : (isError
-                                ? const Color(0xFFBA1A1A)
-                                : (_focusNodes[idx].hasFocus
-                                    ? const Color(0xFF005140)
-                                    : const Color(0xFFBEC9C3))),
-                        width: isSuccess || _focusNodes[idx].hasFocus ? 2.0 : 1.5,
-                      ),
-                      boxShadow: [
-                        if (isSuccess)
-                          const BoxShadow(
-                            color: Color(0x33005140),
-                            blurRadius: 8,
-                            offset: Offset(0, 2),
-                          ),
-                      ],
+                // DMRT Brand Logo (.auth-logo-section & .auth-logo-img)
+                Center(
+                  child: Image.asset(
+                    'assets/dmrt/logo.png',
+                    height: 190,
+                    fit: BoxFit.contain,
+                    errorBuilder: (_, __, ___) => const Icon(
+                      Icons.directions_subway,
+                      size: 80,
+                      color: Color(0xFF005140),
                     ),
-                    child: Center(
-                      child: TextField(
-                        controller: _controllers[idx],
-                        focusNode: _focusNodes[idx],
-                        keyboardType: TextInputType.number,
-                        textAlign: TextAlign.center,
-                        onTap: () {
-                          // Select existing text on tap for easy replacement
-                          _controllers[idx].selection = TextSelection(
-                            baseOffset: 0,
-                            extentOffset: _controllers[idx].text.length,
-                          );
-                        },
-                        style: const TextStyle(
-                          fontFamily: 'Inter',
-                          fontSize: 20,
-                          fontWeight: FontWeight.w700,
-                          color: Color(0xFF181C1A),
-                        ),
-                        decoration: const InputDecoration(
-                          counterText: '',
-                          border: InputBorder.none,
-                          contentPadding: EdgeInsets.zero,
-                        ),
-                        onChanged: (val) => _onDigitChanged(idx, val),
-                      ),
-                    ),
-                  );
-                }),
-              ),
-              const SizedBox(height: 16),
+                  ),
+                ),
+                const SizedBox(height: 12),
 
-              // Feedback message
-              if (_errorText.isNotEmpty)
+                // Header Titles
+                const Text(
+                  'Verify your email',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontFamily: 'Inter',
+                    fontSize: 22,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF181C1A),
+                  ),
+                ),
+                const SizedBox(height: 6),
                 Text(
-                  _errorText,
+                  'Enter the 6-digit code sent to\n$_displayTarget',
                   textAlign: TextAlign.center,
                   style: const TextStyle(
                     fontFamily: 'Inter',
-                    fontSize: 13,
-                    fontWeight: FontWeight.w500,
-                    color: Color(0xFFBA1A1A),
+                    fontSize: 14,
+                    fontWeight: FontWeight.w400,
+                    color: Color(0xFF3E4945),
                   ),
-                )
-              else if (_isVerified)
-                const Wrap(
+                ),
+                const SizedBox(height: 28),
+
+                // 6-digit OTP Box Inputs
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: List.generate(6, (idx) {
+                    final isSuccess = _isVerified && idx <= _successWaveIndex;
+                    final isError = _errorText.isNotEmpty;
+
+                    return Container(
+                      width: 44,
+                      height: 52,
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: isSuccess
+                              ? const Color(0xFF005140)
+                              : (isError
+                                  ? const Color(0xFFBA1A1A)
+                                  : (_focusNodes[idx].hasFocus
+                                      ? const Color(0xFF005140)
+                                      : const Color(0xFFBEC9C3))),
+                          width: isSuccess || _focusNodes[idx].hasFocus ? 2.0 : 1.5,
+                        ),
+                        boxShadow: [
+                          if (isSuccess)
+                            const BoxShadow(
+                              color: Color(0x33005140),
+                              blurRadius: 8,
+                              offset: Offset(0, 2),
+                            ),
+                        ],
+                      ),
+                      child: Center(
+                        child: TextField(
+                          controller: _controllers[idx],
+                          focusNode: _focusNodes[idx],
+                          keyboardType: TextInputType.number,
+                          textAlign: TextAlign.center,
+                          onTap: () {
+                            _controllers[idx].selection = TextSelection(
+                              baseOffset: 0,
+                              extentOffset: _controllers[idx].text.length,
+                            );
+                          },
+                          style: const TextStyle(
+                            fontFamily: 'Inter',
+                            fontSize: 20,
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xFF181C1A),
+                          ),
+                          decoration: const InputDecoration(
+                            counterText: '',
+                            border: InputBorder.none,
+                            contentPadding: EdgeInsets.zero,
+                          ),
+                          onChanged: (val) => _onDigitChanged(idx, val),
+                        ),
+                      ),
+                    );
+                  }),
+                ),
+                const SizedBox(height: 16),
+
+                // Feedback message
+                if (_errorText.isNotEmpty)
+                  Text(
+                    _errorText,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      fontFamily: 'Inter',
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500,
+                      color: Color(0xFFBA1A1A),
+                    ),
+                  )
+                else if (_isChecking)
+                  const Center(
+                    child: SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Color(0xFF005140),
+                      ),
+                    ),
+                  )
+                else if (_isVerified)
+                  const Wrap(
+                    alignment: WrapAlignment.center,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    spacing: 6,
+                    children: [
+                      Icon(Icons.check_circle, size: 18, color: Color(0xFF005140)),
+                      Text(
+                        'Verified',
+                        style: TextStyle(
+                          fontFamily: 'Inter',
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFF005140),
+                        ),
+                      ),
+                    ],
+                  ),
+
+                const SizedBox(height: 24),
+
+                // Resend code timer row
+                Wrap(
                   alignment: WrapAlignment.center,
                   crossAxisAlignment: WrapCrossAlignment.center,
-                  spacing: 6,
                   children: [
-                    Icon(Icons.check_circle, size: 18, color: Color(0xFF005140)),
-                    Text(
-                      'Verified',
+                    const Text(
+                      "Didn't receive the code? ",
                       style: TextStyle(
                         fontFamily: 'Inter',
-                        fontSize: 14,
-                        fontWeight: FontWeight.w700,
-                        color: Color(0xFF005140),
+                        fontSize: 13,
+                        color: Color(0xFF6E7A75),
+                      ),
+                    ),
+                    GestureDetector(
+                      onTap: _resendSeconds == 0 ? _handleResend : null,
+                      child: Text(
+                        _resendSeconds > 0
+                            ? 'Resend ($_resendSeconds s)'
+                            : 'Resend',
+                        style: TextStyle(
+                          fontFamily: 'Inter',
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          color: _resendSeconds == 0
+                              ? const Color(0xFF005140)
+                              : const Color(0xFF6E7A75),
+                        ),
                       ),
                     ),
                   ],
                 ),
-
-              const SizedBox(height: 24),
-
-              // Resend code timer row (Wrap avoids overflow on tight widths/test environments)
-              Wrap(
-                alignment: WrapAlignment.center,
-                crossAxisAlignment: WrapCrossAlignment.center,
-                children: [
-                  const Text(
-                    "Didn't receive the code? ",
-                    style: TextStyle(
-                      fontFamily: 'Inter',
-                      fontSize: 13,
-                      color: Color(0xFF6E7A75),
-                    ),
-                  ),
-                  GestureDetector(
-                    onTap: _resendSeconds == 0 ? _handleResend : null,
-                    child: Text(
-                      _resendSeconds > 0
-                          ? 'Resend ($_resendSeconds s)'
-                          : 'Resend',
-                      style: TextStyle(
-                        fontFamily: 'Inter',
-                        fontSize: 13,
-                        fontWeight: FontWeight.w700,
-                        color: _resendSeconds == 0
-                            ? const Color(0xFF005140)
-                            : const Color(0xFF6E7A75),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
-    ),
-  );
-}
+    );
+  }
 }

@@ -1,4 +1,6 @@
 class UserProfileModel {
+  final String id;
+  final String authId;
   final String fullName;
   final String email;
   final String phoneNumber;
@@ -7,6 +9,8 @@ class UserProfileModel {
   final String? avatarUrl;
 
   const UserProfileModel({
+    this.id = '',
+    this.authId = '',
     this.fullName = '',
     this.email = '',
     this.phoneNumber = '',
@@ -16,6 +20,8 @@ class UserProfileModel {
   });
 
   UserProfileModel copyWith({
+    String? id,
+    String? authId,
     String? fullName,
     String? email,
     String? phoneNumber,
@@ -25,6 +31,8 @@ class UserProfileModel {
     bool clearAvatar = false,
   }) {
     return UserProfileModel(
+      id: id ?? this.id,
+      authId: authId ?? this.authId,
       fullName: fullName ?? this.fullName,
       email: email ?? this.email,
       phoneNumber: phoneNumber ?? this.phoneNumber,
@@ -67,6 +75,8 @@ class UserProfileModel {
 
   Map<String, dynamic> toJson() {
     return {
+      'id': id,
+      'authId': authId,
       'fullName': fullName,
       'email': email,
       'phoneNumber': phoneNumber,
@@ -78,12 +88,14 @@ class UserProfileModel {
 
   factory UserProfileModel.fromJson(Map<String, dynamic> json) {
     return UserProfileModel(
-      fullName: json['fullName'] as String? ?? 'Dhaka Transit User',
-      email: json['email'] as String? ?? 'user@transit.bd',
-      phoneNumber: json['phoneNumber'] as String? ?? '+880 1712-345678',
+      id: json['id'] as String? ?? json['passenger_id'] as String? ?? '',
+      authId: json['authId'] as String? ?? json['auth_id'] as String? ?? '',
+      fullName: json['fullName'] as String? ?? json['name'] as String? ?? 'Dhaka Transit User',
+      email: json['email'] as String? ?? '',
+      phoneNumber: json['phoneNumber'] as String? ?? json['phone_number'] as String? ?? '',
       gender: json['gender'] as String? ?? 'male',
-      dob: json['dob'] as String? ?? '1990-01-01',
-      avatarUrl: json['avatarUrl'] as String?,
+      dob: json['dob'] as String? ?? '1995-05-15',
+      avatarUrl: json['avatarUrl'] as String? ?? json['avatar_url'] as String?,
     );
   }
 }

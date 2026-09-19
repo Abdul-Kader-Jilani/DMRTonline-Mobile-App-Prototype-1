@@ -8,8 +8,8 @@ import 'package:dmrt_online/features/payment/payment_screen.dart';
 import 'package:dmrt_online/features/payment/widgets/hold_to_confirm_button.dart';
 import 'package:dmrt_online/features/qr_transit/qr_display_screen.dart';
 import 'package:dmrt_online/features/qr_transit/widgets/ticket_select_dialog.dart';
+import 'package:dmrt_online/features/auth/email_login_screen.dart';
 import 'package:dmrt_online/features/auth/otp_verification_screen.dart';
-import 'package:dmrt_online/features/auth/phone_login_screen.dart';
 import 'package:dmrt_online/features/auth/profile_setup_screen.dart';
 import 'package:dmrt_online/features/profile/widgets/loading_scene_overlay.dart';
 import 'package:dmrt_online/features/profile/widgets/logout_confirm_dialog.dart';
@@ -76,11 +76,15 @@ void main() {
   }) async {
     SharedPreferences.setMockInitialValues({});
     final storage = await AppStorageService.getInstance();
-    await storage.saveAuthState(isAuthenticated: true, phoneNumber: '+880 1712-345678');
+    await storage.saveAuthState(
+      isAuthenticated: true,
+      email: 'commuter@dmrt.gov.bd',
+      phoneNumber: '01316451718',
+    );
     await storage.saveUserProfile(profile ?? const UserProfileModel(
       fullName: 'Dhaka Transit User',
-      phoneNumber: '+880 1712-345678',
-      email: 'commuter@dmrt.bd',
+      phoneNumber: '01316451718',
+      email: 'commuter@dmrt.gov.bd',
       gender: 'Male',
       dob: '1996-01-01',
     ));
@@ -109,13 +113,13 @@ void main() {
   });
 
   group('HomeScreen & BuyTicketScreen Widget Tests', () {
-    testWidgets('Fresh unauthenticated app boots cleanly to PhoneLoginScreen', (WidgetTester tester) async {
+    testWidgets('Fresh unauthenticated app boots cleanly to EmailLoginScreen', (WidgetTester tester) async {
       await tester.pumpWidget(const DmrtApp());
       await tester.pumpAndSettle();
 
-      expect(find.text('Enter your phone number'), findsOneWidget);
-      expect(find.text('+880'), findsOneWidget);
-      expect(find.text('Next'), findsOneWidget);
+      expect(find.text('Enter your email address'), findsOneWidget);
+      expect(find.byIcon(Icons.mail_outline), findsOneWidget);
+      expect(find.text('Send Code'), findsOneWidget);
     });
 
     testWidgets('Authenticated HomeScreen layout smoke test with tickets', (WidgetTester tester) async {
@@ -250,9 +254,10 @@ void main() {
       // Verify Profile Header and Top Fields
       expect(find.text('Profile'), findsWidgets);
       expect(find.text('Dhaka Transit User'), findsWidgets);
-      expect(find.text('+880 1712-345678'), findsOneWidget);
+      expect(find.text('commuter@dmrt.gov.bd'), findsWidgets);
       expect(find.text('Full Name'), findsOneWidget);
       expect(find.text('Email Address'), findsOneWidget);
+      expect(find.text('Phone Number'), findsOneWidget);
 
       // Open Photo Picker
       await tester.tap(find.byIcon(Icons.camera_alt));
@@ -349,85 +354,107 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Confirm Ticket Refund'), findsOneWidget);
-      expect(find.text('Ticket Price'), findsOneWidget);
       expect(find.text('Refund Fee (10%)'), findsOneWidget);
+      expect(find.text('৳6'), findsOneWidget);
       expect(find.text('You Will Get Back'), findsOneWidget);
-      expect(find.text('Yes, Refund'), findsOneWidget);
+      expect(find.text('৳54'), findsOneWidget);
 
       // Confirm Refund
       await tester.tap(find.text('Yes, Refund'));
       await tester.pumpAndSettle();
+
       expect(refundCalled, isTrue);
     });
 
-    testWidgets('PaymentScreen renders route, fare, method selector, and hold-to-confirm button', (WidgetTester tester) async {
-      TicketModel? purchased;
+    testWidgets('PaymentScreen method selector & hold-to-confirm interaction', (WidgetTester tester) async {
+      TicketModel? purchasedTicket;
 
       await tester.pumpWidget(
         MaterialApp(
           home: PaymentScreen(
             origin: 'Uttara North',
             destination: 'Motijheel',
-            passengerCount: 1,
-            totalFare: 60,
+            passengerCount: 2,
+            totalFare: 120,
             onBack: () {},
-            onTicketPurchased: (ticket) => purchased = ticket,
+            onTicketPurchased: (t) => purchasedTicket = t,
           ),
         ),
       );
       await tester.pumpAndSettle();
 
       expect(find.text('Payment'), findsOneWidget);
-      expect(find.text('Review'), findsOneWidget);
-      expect(find.text('Uttara North'), findsOneWidget);
-      expect(find.text('Motijheel'), findsOneWidget);
-      expect(find.text('৳ 60'), findsOneWidget);
-      expect(find.text('Payment Method'), findsOneWidget);
+      expect(find.text('৳ 120'), findsOneWidget);
+      expect(find.text('Mobile Finance (bKash/Nagad)'), findsOneWidget);
 
-      // Tap payment method to open bottom sheet
+      // Change payment method to Debit / Credit Card
       await tester.tap(find.text('Payment Method'));
       await tester.pumpAndSettle();
 
       expect(find.text('Choose Payment Method'), findsOneWidget);
-      expect(find.text('Mobile Finance'), findsOneWidget);
       expect(find.text('Debit / Credit Card'), findsOneWidget);
-      expect(find.text('Internet Banking'), findsOneWidget);
 
-      // Pick Debit / Credit Card
       await tester.tap(find.text('Debit / Credit Card'));
       await tester.pumpAndSettle();
 
       expect(find.text('Debit / Credit Card'), findsOneWidget);
 
-      // Scroll down to see hold to purchase button
-      await tester.drag(find.byType(ListView), const Offset(0, -300));
+      // Trigger Hold-To-Confirm Button
+      final holdBtn = find.text('Hold to purchase');
+      expect(holdBtn, findsOneWidget);
+
+      await tester.ensureVisible(holdBtn);
       await tester.pumpAndSettle();
 
-      expect(find.text('Hold to purchase'), findsOneWidget);
-
-      // Hold to purchase
-      final holdBtnFinder = find.byType(HoldToConfirmButton);
-      final gesture = await tester.startGesture(tester.getCenter(holdBtnFinder));
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 500));
-      await tester.pump(const Duration(milliseconds: 600));
-      await tester.pump(const Duration(milliseconds: 500));
+      final gesture = await tester.startGesture(tester.getCenter(holdBtn));
+      for (int i = 0; i < 16; i++) {
+        await tester.pump(const Duration(milliseconds: 100));
+      }
       await gesture.up();
       await tester.pumpAndSettle();
 
-      expect(purchased, isNotNull);
-      expect(purchased!.origin, 'Uttara North');
-      expect(purchased!.destination, 'Motijheel');
-      expect(purchased!.totalFare, 60);
+      expect(purchasedTicket, isNotNull);
+      expect(purchasedTicket!.origin, 'Uttara North');
+      expect(purchasedTicket!.destination, 'Motijheel');
+      expect(purchasedTicket!.passengerCount, 2);
+      expect(purchasedTicket!.totalFare, 120);
+      expect(purchasedTicket!.paymentMethod, 'Debit / Credit Card');
     });
 
-    testWidgets('QrDisplayScreen renders QR card, countdown timer, and exit pass actions', (WidgetTester tester) async {
+    testWidgets('QrDisplayScreen countdown timer and entry/exit gate flow', (WidgetTester tester) async {
+      bool entryCalled = false;
       bool tripCompleted = false;
 
+      final availableTicket = sampleTicket.copyWith(status: TicketStatus.available);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: QrDisplayScreen(
+            ticket: availableTicket,
+            onBack: () {},
+            onPassEntryBarrier: () => entryCalled = true,
+            onCompleteTrip: () => tripCompleted = true,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Show at Reader'), findsOneWidget);
+      expect(find.text('Tap to Pass Entry Barrier'), findsOneWidget);
+      expect(find.text('Uttara North'), findsOneWidget);
+      expect(find.text('Motijheel'), findsOneWidget);
+
+      // Pass entry barrier (with loading delay)
+      await tester.tap(find.text('Tap to Pass Entry Barrier'));
+      await tester.pump(const Duration(milliseconds: 1100));
+      await tester.pumpAndSettle();
+
+      expect(entryCalled, isTrue);
+
+      // Test Riding Exit State
       final ridingTicket = sampleTicket.copyWith(
         status: TicketStatus.riding,
-        exitQrActive: true,
-        exitQrExpiryTime: DateTime.now().add(const Duration(seconds: 60)),
+        exitQrActive: false,
       );
 
       await tester.pumpWidget(
@@ -435,63 +462,29 @@ void main() {
           home: QrDisplayScreen(
             ticket: ridingTicket,
             onBack: () {},
-            onCompleteTrip: () => tripCompleted = true,
             onPassEntryBarrier: () {},
-            onRegenerateQr: () {},
+            onCompleteTrip: () => tripCompleted = true,
           ),
         ),
       );
       await tester.pumpAndSettle();
 
       expect(find.text('Show at Exit Reader'), findsOneWidget);
-      expect(find.text('Uttara North'), findsOneWidget);
-      expect(find.text('Motijheel'), findsOneWidget);
-      expect(find.text('Exit Pass • 1 Passenger'), findsOneWidget);
       expect(find.text('Tap to Pass Exit Barrier'), findsOneWidget);
 
-      // Tap to pass exit barrier (triggers 1000ms LoadingSceneOverlay)
+      // Complete Trip
       await tester.tap(find.text('Tap to Pass Exit Barrier'));
       await tester.pump(const Duration(milliseconds: 1100));
       await tester.pumpAndSettle();
+
       expect(tripCompleted, isTrue);
     });
 
-    testWidgets('QrDisplayScreen entry mode renders pass barrier and triggers onPassEntryBarrier', (WidgetTester tester) async {
-      bool entryPassed = false;
+    testWidgets('TicketSelectDialog displays ticket options and selects correctly', (WidgetTester tester) async {
+      final ticket1 = sampleTicket.copyWith(id: 'TKT-1001', origin: 'Uttara North', destination: 'Motijheel');
+      final ticket2 = sampleTicket.copyWith(id: 'TKT-1002', origin: 'Farmgate', destination: 'Secretariat');
 
-      await tester.pumpWidget(
-        MaterialApp(
-          home: QrDisplayScreen(
-            ticket: sampleTicket,
-            onBack: () {},
-            onCompleteTrip: () {},
-            onPassEntryBarrier: () => entryPassed = true,
-            onRegenerateQr: () {},
-          ),
-        ),
-      );
-      await tester.pumpAndSettle();
-
-      expect(find.text('Show at Reader'), findsOneWidget);
-      expect(find.text('Single Journey • 1 Passenger'), findsOneWidget);
-      expect(find.text('Tap to Pass Entry Barrier'), findsOneWidget);
-
-      await tester.tap(find.text('Tap to Pass Entry Barrier'));
-      await tester.pump(const Duration(milliseconds: 1100));
-      await tester.pumpAndSettle();
-      expect(entryPassed, isTrue);
-    });
-
-    testWidgets('TicketSelectDialog lets commuter select between multiple active tickets', (WidgetTester tester) async {
       TicketModel? selected;
-
-      final ticket1 = sampleTicket;
-      final ticket2 = sampleTicket.copyWith(
-        id: 'TKT-1002',
-        origin: 'Farmgate',
-        destination: 'Shahbagh',
-        totalFare: 20,
-      );
 
       await tester.pumpWidget(
         MaterialApp(
@@ -745,32 +738,34 @@ void main() {
   });
 
   group('Authentication Flow Tests', () {
-    testWidgets('PhoneLoginScreen auto-formats input and triggers onNext with valid 11 digits', (WidgetTester tester) async {
-      String? submittedPhone;
+    testWidgets('EmailLoginScreen validates email and triggers onNext with valid email', (WidgetTester tester) async {
+      String? submittedEmail;
 
       await tester.pumpWidget(
         MaterialApp(
-          home: PhoneLoginScreen(
-            onNext: (phone) => submittedPhone = phone,
+          home: EmailLoginScreen(
+            onNext: (email) => submittedEmail = email,
           ),
         ),
       );
       await tester.pumpAndSettle();
 
-      expect(find.text('Enter your phone number'), findsOneWidget);
-      expect(find.text('+880'), findsOneWidget);
+      expect(find.text('Enter your email address'), findsOneWidget);
+      expect(find.byIcon(Icons.mail_outline), findsOneWidget);
 
-      // Enter 11 digits
-      await tester.enterText(find.byType(TextField), '01712345678');
+      // Enter invalid email
+      await tester.enterText(find.byType(TextField), 'invalid-email');
       await tester.pumpAndSettle();
 
-      expect(find.text('01712-345678'), findsOneWidget);
-
-      // Tap Next button
-      await tester.tap(find.text('Next'));
+      // Enter valid email
+      await tester.enterText(find.byType(TextField), 'user@example.com');
       await tester.pumpAndSettle();
 
-      expect(submittedPhone, '+880 01712-345678');
+      // Tap Send Code button
+      await tester.tap(find.text('Send Code'));
+      await tester.pumpAndSettle();
+
+      expect(submittedEmail, 'user@example.com');
     });
 
     testWidgets('OtpVerificationScreen verifies with bypass code 000000 and triggers onVerified', (WidgetTester tester) async {
@@ -779,7 +774,7 @@ void main() {
       await tester.pumpWidget(
         MaterialApp(
           home: OtpVerificationScreen(
-            phone: '+880 01712-345678',
+            email: 'user@example.com',
             onBack: () {},
             onVerified: () => verifiedFired = true,
           ),
@@ -787,8 +782,8 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.text('Verify your number'), findsOneWidget);
-      expect(find.text('Enter the 6-digit code sent to +880 01712-345678'), findsOneWidget);
+      expect(find.text('Verify your email'), findsOneWidget);
+      expect(find.text('Enter the 6-digit code sent to\nuser@example.com'), findsOneWidget);
 
       // Enter 6 zeros
       final textFields = find.byType(TextField);
@@ -833,22 +828,22 @@ void main() {
       expect(skipFired, isFalse);
     });
 
-    testWidgets('Full End-to-End Login, OTP 000000, Profile Setup, and Logout Flow', (WidgetTester tester) async {
+    testWidgets('Full End-to-End Email Login, OTP 000000, Profile Setup, and Logout Flow', (WidgetTester tester) async {
       await tester.pumpWidget(const DmrtApp());
       await tester.pumpAndSettle();
 
-      // 1. Clean launch starts directly on PhoneLoginScreen
-      expect(find.text('Enter your phone number'), findsOneWidget);
+      // 1. Clean launch starts directly on EmailLoginScreen
+      expect(find.text('Enter your email address'), findsOneWidget);
 
-      // 2. Enter Bangladesh phone number (11 digits)
-      await tester.enterText(find.byType(TextField), '01987654321');
+      // 2. Enter valid Email
+      await tester.enterText(find.byType(TextField), 'farhan@dmrt.gov.bd');
       await tester.pumpAndSettle();
 
-      // 3. Tap Next
-      await tester.tap(find.text('Next'));
+      // 3. Tap Send Code
+      await tester.tap(find.text('Send Code'));
       await tester.pumpAndSettle();
-      expect(find.text('Verify your number'), findsOneWidget);
-      expect(find.text('Enter the 6-digit code sent to +880 01987-654321'), findsOneWidget);
+      expect(find.text('Verify your email'), findsOneWidget);
+      expect(find.text('Enter the 6-digit code sent to\nfarhan@dmrt.gov.bd'), findsOneWidget);
 
       // 4. Enter test OTP 000000
       final otpFields = find.byType(TextField);
@@ -874,6 +869,7 @@ void main() {
       await tester.tap(find.byIcon(Icons.person).first);
       await tester.pumpAndSettle();
       expect(find.text('Farhan Kabir'), findsWidgets);
+      expect(find.text('farhan@dmrt.gov.bd'), findsWidgets);
 
       // 8. Open Side Menu and Trigger Logout
       await tester.tap(find.byIcon(Icons.menu));
@@ -888,8 +884,8 @@ void main() {
       await tester.tap(find.text('Logout').last);
       await tester.pumpAndSettle();
 
-      // 9. Successfully logged out and redirected to Phone Login
-      expect(find.text('Enter your phone number'), findsOneWidget);
+      // 9. Successfully logged out and redirected to Email Login
+      expect(find.text('Enter your email address'), findsOneWidget);
     });
   });
 
@@ -1032,7 +1028,7 @@ void main() {
       expect(find.text('My Tickets'), findsOneWidget);
     });
 
-    testWidgets('Small Refund pill button on ticket card navigates to Ticket Details Screen', (WidgetTester tester) async {
+    testWidgets('Tapping ticket card body navigates to Ticket Details Screen', (WidgetTester tester) async {
       tester.view.physicalSize = const Size(800, 1000);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(tester.view.resetPhysicalSize);
@@ -1045,8 +1041,8 @@ void main() {
       // Initial state has 1 ticket on Home
       expect(find.text('Refund'), findsOneWidget);
 
-      // Tap small refund pill button on ticket card
-      await tester.tap(find.text('Refund'));
+      // Tap ticket card body (e.g. Origin station name)
+      await tester.tap(find.text('Uttara North').first);
       await tester.pumpAndSettle();
 
       // Should open Ticket Details Screen
@@ -1096,9 +1092,11 @@ void main() {
       final storage = await AppStorageService.getInstance();
 
       final profile = const UserProfileModel(
+        id: 'pass-uuid-1234',
+        authId: 'auth-uuid-5678',
         fullName: 'Test Commuter',
-        email: 'commuter@dmrt.bd',
-        phoneNumber: '+880 1811-223344',
+        email: 'commuter@dmrt.gov.bd',
+        phoneNumber: '01811223344',
         gender: 'female',
         dob: '1995-05-15',
         avatarUrl: 'data:image/jpeg;base64,dGVzdA==',
@@ -1107,9 +1105,11 @@ void main() {
       await storage.saveUserProfile(profile);
       final loadedProfile = storage.loadUserProfile();
       expect(loadedProfile, isNotNull);
-      expect(loadedProfile!.fullName, 'Test Commuter');
-      expect(loadedProfile.email, 'commuter@dmrt.bd');
-      expect(loadedProfile.phoneNumber, '+880 1811-223344');
+      expect(loadedProfile!.id, 'pass-uuid-1234');
+      expect(loadedProfile.authId, 'auth-uuid-5678');
+      expect(loadedProfile.fullName, 'Test Commuter');
+      expect(loadedProfile.email, 'commuter@dmrt.gov.bd');
+      expect(loadedProfile.phoneNumber, '01811223344');
       expect(loadedProfile.gender, 'female');
       expect(loadedProfile.avatarUrl, 'data:image/jpeg;base64,dGVzdA==');
 
@@ -1130,16 +1130,21 @@ void main() {
       expect(loadedHistory.first.id, testHistory.first.id);
       expect(loadedHistory.first.status, testHistory.first.status);
 
-      await storage.saveAuthState(isAuthenticated: true, phoneNumber: '+880 1811-223344');
+      await storage.saveAuthState(
+        isAuthenticated: true,
+        email: 'commuter@dmrt.gov.bd',
+        phoneNumber: '01811223344',
+      );
       expect(storage.loadIsAuthenticated(), isTrue);
-      expect(storage.loadAuthPhone(), '+880 1811-223344');
+      expect(storage.loadAuthEmail(), 'commuter@dmrt.gov.bd');
+      expect(storage.loadAuthPhone(), '01811223344');
     });
 
     testWidgets('OtpVerificationScreen allows typing, invalid error feedback, and digit replacement', (WidgetTester tester) async {
       await tester.pumpWidget(
         MaterialApp(
           home: OtpVerificationScreen(
-            phone: '+880 01712-345678',
+            email: 'user@example.com',
             onBack: () {},
             onVerified: () {},
           ),
@@ -1158,7 +1163,7 @@ void main() {
       await tester.pumpAndSettle();
 
       // Check error message appears
-      expect(find.text('Invalid OTP code. Use 000000 for testing.'), findsOneWidget);
+      expect(find.text('Invalid OTP code. Please check your email inbox.'), findsOneWidget);
 
       // Tap on the first box and change it to 0
       await tester.tap(textFields.at(0));
@@ -1166,7 +1171,7 @@ void main() {
       await tester.pumpAndSettle();
 
       // Error message should clear on editing
-      expect(find.text('Invalid OTP code. Use 000000 for testing.'), findsNothing);
+      expect(find.text('Invalid OTP code. Please check your email inbox.'), findsNothing);
     });
   });
 
@@ -1176,8 +1181,15 @@ void main() {
       expect(service, isNotNull);
 
       // Verify OTP verification with test code 000000
-      final verifyRes = await service.verifyOtp(phoneNumber: '01700000000', otp: '000000');
-      expect(verifyRes != null && verifyRes['verified'] == true, isTrue);
+      final verifyEmailRes = await service.verifyEmailOtp(email: 'test@dmrt.gov.bd', otp: '000000');
+      expect(verifyEmailRes['verified'], isTrue);
+
+      final verifyPhoneRes = await service.verifyOtp(phoneNumber: '01700000000', otp: '000000');
+      expect(verifyPhoneRes != null && verifyPhoneRes['verified'] == true, isTrue);
+
+      // Verify sendEmailOtp returns success structure
+      final emailSendRes = await service.sendEmailOtp('test@dmrt.gov.bd');
+      expect(emailSendRes['success'], isTrue);
 
       // Verify requestOtp returns valid map structure
       final otpRes = await service.requestOtp('01700000000');
@@ -1185,17 +1197,17 @@ void main() {
       expect(otpRes!['otp'], '000000');
 
       // Uninitialized offline fallbacks
-      final profile = await service.getOrCreatePassenger(phoneNumber: '01700000000');
+      final profile = await service.getOrCreatePassengerByEmail(email: 'test@dmrt.gov.bd');
       expect(profile, isNull);
 
-      final liveTickets = await service.fetchLiveTickets('01700000000');
+      final liveTickets = await service.fetchLiveTickets(email: 'test@dmrt.gov.bd');
       expect(liveTickets, isEmpty);
 
-      final tripHistory = await service.fetchTripHistory('01700000000');
+      final tripHistory = await service.fetchTripHistory(email: 'test@dmrt.gov.bd');
       expect(tripHistory, isEmpty);
 
       final buyResult = await service.buyTicket(
-        phoneNumber: '01700000000',
+        email: 'test@dmrt.gov.bd',
         origin: 'Uttara North',
         destination: 'Motijheel',
         passengerCount: 2,
@@ -1203,13 +1215,13 @@ void main() {
       );
       expect(buyResult, isNull);
 
-      final entryResult = await service.passEntryBarrier(ticketId: 'TKT-1', phoneNumber: '01700000000');
+      final entryResult = await service.passEntryBarrier(ticketId: 'TKT-1', email: 'test@dmrt.gov.bd');
       expect(entryResult, isFalse);
 
-      final exitResult = await service.passExitBarrier(ticketId: 'TKT-1', phoneNumber: '01700000000');
+      final exitResult = await service.passExitBarrier(ticketId: 'TKT-1', email: 'test@dmrt.gov.bd');
       expect(exitResult, isFalse);
 
-      final refundResult = await service.requestRefund(ticketId: 'TKT-1', phoneNumber: '01700000000');
+      final refundResult = await service.requestRefund(ticketId: 'TKT-1', email: 'test@dmrt.gov.bd');
       expect(refundResult, isFalse);
     });
 

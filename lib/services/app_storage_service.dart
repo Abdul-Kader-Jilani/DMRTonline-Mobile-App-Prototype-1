@@ -9,6 +9,7 @@ class AppStorageService {
   static const String _keyTickets = 'dmrt_active_tickets';
   static const String _keyHistory = 'dmrt_ticket_history';
   static const String _keyIsAuthenticated = 'dmrt_is_authenticated';
+  static const String _keyAuthEmail = 'dmrt_auth_email';
   static const String _keyAuthPhone = 'dmrt_auth_phone';
 
   static AppStorageService? _instance;
@@ -87,10 +88,16 @@ class AppStorageService {
   // --- Auth State ---
   Future<bool> saveAuthState({
     required bool isAuthenticated,
+    String? email,
     String? phoneNumber,
   }) async {
     await _prefs.setBool(_keyIsAuthenticated, isAuthenticated);
-    if (phoneNumber != null) {
+    if (email != null && email.isNotEmpty) {
+      await _prefs.setString(_keyAuthEmail, email);
+    } else {
+      await _prefs.remove(_keyAuthEmail);
+    }
+    if (phoneNumber != null && phoneNumber.isNotEmpty) {
       await _prefs.setString(_keyAuthPhone, phoneNumber);
     } else {
       await _prefs.remove(_keyAuthPhone);
@@ -100,6 +107,10 @@ class AppStorageService {
 
   bool loadIsAuthenticated() {
     return _prefs.getBool(_keyIsAuthenticated) ?? true;
+  }
+
+  String? loadAuthEmail() {
+    return _prefs.getString(_keyAuthEmail);
   }
 
   String? loadAuthPhone() {

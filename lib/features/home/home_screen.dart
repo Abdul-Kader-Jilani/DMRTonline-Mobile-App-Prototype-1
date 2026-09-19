@@ -5,8 +5,8 @@ import '../../shared/app_gradients.dart';
 import '../../shared/bottom_nav_bar.dart';
 import '../../shared/models/ticket_model.dart';
 import '../../shared/widgets/app_toast.dart';
+import '../auth/email_login_screen.dart';
 import '../auth/otp_verification_screen.dart';
-import '../auth/phone_login_screen.dart';
 import '../auth/profile_setup_screen.dart';
 import '../buy_ticket/buy_ticket_screen.dart';
 import '../history/history_screen.dart';
@@ -66,8 +66,8 @@ class _HomeScreenState extends State<HomeScreen> {
   TicketModel? _activeQrTicket;
 
   // Active Auth views
-  String? _activeAuthScreen; // 'phone', 'otp', 'setup'
-  String? _authPendingPhone;
+  String? _activeAuthScreen; // 'email', 'otp', 'setup'
+  String? _authPendingEmail;
 
   @override
   void initState() {
@@ -82,10 +82,13 @@ class _HomeScreenState extends State<HomeScreen> {
     final savedTickets = storage.loadTickets() ?? [];
     final savedHistory = storage.loadHistory() ?? [];
 
+    final hasIdentifier = profile != null &&
+        (profile.email.isNotEmpty || profile.phoneNumber.isNotEmpty);
+
     if (mounted) {
       setState(() {
-        if (!isAuth || profile == null || profile.phoneNumber.isEmpty) {
-          _activeAuthScreen = 'phone';
+        if (!isAuth || !hasIdentifier) {
+          _activeAuthScreen = 'email';
           _userProfile = const UserProfileModel(
             fullName: 'Metro Commuter',
             phoneNumber: '',
@@ -102,18 +105,37 @@ class _HomeScreenState extends State<HomeScreen> {
       });
     }
 
-    if (isAuth && profile != null && profile.phoneNumber.isNotEmpty) {
+    if (isAuth && hasIdentifier) {
       _syncWithSupabase();
     }
   }
 
   Future<void> _syncWithSupabase() async {
-    final phone = _userProfile.phoneNumber;
-    if (phone.isEmpty || !SupabaseService.instance.isInitialized) return;
+    if (!SupabaseService.instance.isInitialized) return;
     try {
-      final serverProfile = await SupabaseService.instance.getOrCreatePassenger(phoneNumber: phone);
-      final serverTickets = await SupabaseService.instance.fetchLiveTickets(phone);
-      final serverHistory = await SupabaseService.instance.fetchTripHistory(phone);
+      UserProfileModel? serverProfile;
+      if (_userProfile.email.isNotEmpty) {
+        serverProfile = await SupabaseService.instance.getOrCreatePassengerByEmail(
+          email: _userProfile.email,
+          authId: _userProfile.authId.isNotEmpty ? _userProfile.authId : null,
+        );
+      } else if (_userProfile.phoneNumber.isNotEmpty) {
+        serverProfile = await SupabaseService.instance.getOrCreatePassenger(
+          phoneNumber: _userProfile.phoneNumber,
+        );
+      }
+
+      final serverTickets = await SupabaseService.instance.fetchLiveTickets(
+        passengerId: _userProfile.id.isNotEmpty ? _userProfile.id : serverProfile?.id,
+        email: _userProfile.email,
+        phoneNumber: _userProfile.phoneNumber,
+      );
+
+      final serverHistory = await SupabaseService.instance.fetchTripHistory(
+        passengerId: _userProfile.id.isNotEmpty ? _userProfile.id : serverProfile?.id,
+        email: _userProfile.email,
+        phoneNumber: _userProfile.phoneNumber,
+      );
 
       if (mounted) {
         setState(() {
@@ -177,6 +199,8 @@ class _HomeScreenState extends State<HomeScreen> {
     // Async sync with Supabase
     SupabaseService.instance.requestRefund(
       ticketId: ticket.id,
+      passengerId: _userProfile.id,
+      email: _userProfile.email,
       phoneNumber: _userProfile.phoneNumber,
     );
 
@@ -184,12 +208,11 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _handleBottomNavScan() {
-    // 1. If currently riding, check if timer is still active
+    // 1. If currently riding -> go directly to QrDisplayScreen
     final ridingTicket = _tickets.cast<TicketModel?>().firstWhere(
       (t) => t?.status == TicketStatus.riding,
       orElse: () => null,
     );
-    // 1. If riding ticket exists -> go directly to QrDisplayScreen
     if (ridingTicket != null) {
       setState(() {
         _activeQrTicket = ridingTicket;
@@ -300,6 +323,8 @@ class _HomeScreenState extends State<HomeScreen> {
               setState(() {
                 _activeQrTicket = ticket;
               });
+            } else if (cardStatus == TicketCardStatus.locked) {
+              _showToast('Finish your active journey first before using another ticket.');
             } else {
               setState(() {
                 _activeDetailTicket = ticket;
@@ -307,29 +332,23 @@ class _HomeScreenState extends State<HomeScreen> {
             }
           },
           onUseTicket: () {
-            if (ticket.status == TicketStatus.riding) {
-              setState(() {
-                _activeQrTicket = ticket;
-              });
-            } else if (ticket.status == TicketStatus.available) {
-              LoadingSceneOverlay.runWithLoading(
-                context,
-                'Generating Ticket QR...',
-                () {
-                  if (mounted) {
-                    setState(() {
-                      _activeQrTicket = ticket;
-                    });
-                  }
-                },
-              );
+            if (hasRidingTicket && ticket.status != TicketStatus.riding) {
+              _showToast('Finish your active journey first before using another ticket.');
+              return;
             }
+            LoadingSceneOverlay.runWithLoading(
+              context,
+              'Generating Ticket QR...',
+              () {
+                if (mounted) {
+                  setState(() {
+                    _activeQrTicket = ticket;
+                  });
+                }
+              },
+            );
           },
-          onRefund: () {
-            setState(() {
-              _activeDetailTicket = ticket;
-            });
-          },
+          onRefund: () => _handleRefundTicket(ticket),
         );
       },
     );
@@ -389,7 +408,7 @@ class _HomeScreenState extends State<HomeScreen> {
             setState(() {
               _userProfile = emptyProfile;
               _currentNavIndex = 0;
-              _activeAuthScreen = 'phone';
+              _activeAuthScreen = 'email';
             });
             final storage = await AppStorageService.getInstance();
             await storage.saveUserProfile(emptyProfile);
@@ -397,11 +416,11 @@ class _HomeScreenState extends State<HomeScreen> {
             _showToast('Logged out successfully!');
           },
           onOpenPhoneLogin: () {
-            setState(() => _activeAuthScreen = 'phone');
+            setState(() => _activeAuthScreen = 'email');
           },
           onOpenOtpVerification: () {
             setState(() {
-              _authPendingPhone = _userProfile.phoneNumber;
+              _authPendingEmail = _userProfile.email;
               _activeAuthScreen = 'otp';
             });
           },
@@ -450,7 +469,7 @@ class _HomeScreenState extends State<HomeScreen> {
       if (_activeAuthScreen == 'setup') {
         setState(() => _activeAuthScreen = 'otp');
       } else if (_activeAuthScreen == 'otp') {
-        setState(() => _activeAuthScreen = 'phone');
+        setState(() => _activeAuthScreen = 'email');
       } else {
         setState(() => _activeAuthScreen = null);
       }
@@ -498,14 +517,13 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _buildScreenContent(BuildContext context) {
     // Check if auth screens are active
-    if (_activeAuthScreen == 'phone') {
-      return PhoneLoginScreen(
-        onNext: (fullPhone) {
+    if (_activeAuthScreen == 'email') {
+      return EmailLoginScreen(
+        onNext: (email) {
           setState(() {
-            _authPendingPhone = fullPhone;
+            _authPendingEmail = email;
             _activeAuthScreen = 'otp';
           });
-          SupabaseService.instance.requestOtp(fullPhone);
         },
         onBack: () => setState(() => _activeAuthScreen = null),
       );
@@ -513,12 +531,15 @@ class _HomeScreenState extends State<HomeScreen> {
 
     if (_activeAuthScreen == 'otp') {
       return OtpVerificationScreen(
-        phone: _authPendingPhone ?? _userProfile.phoneNumber,
-        onBack: () => setState(() => _activeAuthScreen = 'phone'),
+        email: _authPendingEmail ?? _userProfile.email,
+        phone: _userProfile.phoneNumber,
+        onBack: () => setState(() => _activeAuthScreen = 'email'),
         onVerified: () async {
-          final phone = _authPendingPhone ?? _userProfile.phoneNumber;
-          final serverProfile = await SupabaseService.instance.getOrCreatePassenger(phoneNumber: phone);
-          final updated = serverProfile ?? _userProfile.copyWith(phoneNumber: phone);
+          final email = _authPendingEmail ?? _userProfile.email;
+          final serverProfile = await SupabaseService.instance.getOrCreatePassengerByEmail(
+            email: email,
+          );
+          final updated = serverProfile ?? _userProfile.copyWith(email: email);
 
           if (updated.fullName.isNotEmpty && updated.fullName != 'Metro Commuter') {
             setState(() {
@@ -528,7 +549,11 @@ class _HomeScreenState extends State<HomeScreen> {
             });
             await _saveProfile(updated);
             final storage = await AppStorageService.getInstance();
-            await storage.saveAuthState(isAuthenticated: true, phoneNumber: updated.phoneNumber);
+            await storage.saveAuthState(
+              isAuthenticated: true,
+              email: updated.email,
+              phoneNumber: updated.phoneNumber,
+            );
             _showToast('Welcome back, ${updated.fullName.split(' ').first}!');
             _syncWithSupabase();
           } else {
@@ -544,9 +569,11 @@ class _HomeScreenState extends State<HomeScreen> {
     if (_activeAuthScreen == 'setup') {
       return ProfileSetupScreen(
         onSkip: () async {
-          final phone = _authPendingPhone ?? _userProfile.phoneNumber;
-          final serverProfile = await SupabaseService.instance.getOrCreatePassenger(phoneNumber: phone);
-          final updated = serverProfile ?? _userProfile.copyWith(phoneNumber: phone);
+          final email = _authPendingEmail ?? _userProfile.email;
+          final serverProfile = await SupabaseService.instance.getOrCreatePassengerByEmail(
+            email: email,
+          );
+          final updated = serverProfile ?? _userProfile.copyWith(email: email);
           setState(() {
             _userProfile = updated;
             _activeAuthScreen = null;
@@ -554,16 +581,20 @@ class _HomeScreenState extends State<HomeScreen> {
           });
           await _saveProfile(updated);
           final storage = await AppStorageService.getInstance();
-          await storage.saveAuthState(isAuthenticated: true, phoneNumber: updated.phoneNumber);
+          await storage.saveAuthState(
+            isAuthenticated: true,
+            email: updated.email,
+            phoneNumber: updated.phoneNumber,
+          );
           _showToast('Logged in successfully!');
           _syncWithSupabase();
         },
         onComplete: (fullName, avatar) async {
-          final phone = _authPendingPhone ?? _userProfile.phoneNumber;
+          final email = _authPendingEmail ?? _userProfile.email;
           final updated = _userProfile.copyWith(
             fullName: fullName.isNotEmpty ? fullName : _userProfile.fullName,
             avatarUrl: avatar,
-            phoneNumber: phone,
+            email: email,
           );
           setState(() {
             _userProfile = updated;
@@ -572,9 +603,13 @@ class _HomeScreenState extends State<HomeScreen> {
           });
           await _saveProfile(updated);
           final storage = await AppStorageService.getInstance();
-          await storage.saveAuthState(isAuthenticated: true, phoneNumber: updated.phoneNumber);
+          await storage.saveAuthState(
+            isAuthenticated: true,
+            email: updated.email,
+            phoneNumber: updated.phoneNumber,
+          );
           _showToast('Profile setup completed successfully!');
-          
+
           await SupabaseService.instance.updatePassengerProfile(updated);
           _syncWithSupabase();
         },
@@ -631,6 +666,8 @@ class _HomeScreenState extends State<HomeScreen> {
 
           // Async sync with Supabase
           final serverTicket = await SupabaseService.instance.buyTicket(
+            passengerId: _userProfile.id,
+            email: _userProfile.email,
             phoneNumber: _userProfile.phoneNumber,
             origin: purchasedTicket.origin,
             destination: purchasedTicket.destination,
@@ -680,6 +717,8 @@ class _HomeScreenState extends State<HomeScreen> {
           // Sync with Supabase
           SupabaseService.instance.passEntryBarrier(
             ticketId: currentTicket.id,
+            passengerId: _userProfile.id,
+            email: _userProfile.email,
             phoneNumber: _userProfile.phoneNumber,
           );
 
@@ -723,6 +762,8 @@ class _HomeScreenState extends State<HomeScreen> {
           // Sync with Supabase
           SupabaseService.instance.passExitBarrier(
             ticketId: currentTicket.id,
+            passengerId: _userProfile.id,
+            email: _userProfile.email,
             phoneNumber: _userProfile.phoneNumber,
           );
 
